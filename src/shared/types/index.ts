@@ -194,6 +194,72 @@ export interface CampaignInvite {
   created_at: string
 }
 
+// ── Ficha D&D 5e ────────────────────────────────────────
+
+export interface DndCharacterSheet {
+  // Estruturais
+  id:          string
+  campaign_id: string
+  user_id:     string
+  // Personagem
+  character_name:     string | null
+  player_name:        string | null
+  class_name:         string | null
+  subclass:           string | null
+  background:         string | null
+  race:               string | null
+  alignment:          string | null
+  // Progressão
+  level:              number
+  experience:         number
+  inspiration:        boolean
+  // Combate
+  armor_class:        number
+  initiative_bonus:   number
+  speed:              number
+  proficiency_bonus:  number
+  // Pontos de vida
+  hp_current:         number
+  hp_max:             number
+  hp_temp:            number
+  // Atributos (1–30)
+  strength:           number
+  dexterity:          number
+  constitution:       number
+  intelligence:       number
+  wisdom:             number
+  charisma:           number
+  // Proficiências em salvaguardas
+  strength_save_proficient:     boolean
+  dexterity_save_proficient:    boolean
+  constitution_save_proficient: boolean
+  intelligence_save_proficient: boolean
+  wisdom_save_proficient:       boolean
+  charisma_save_proficient:     boolean
+  // Salvaguardas mortais
+  death_save_successes: number
+  death_save_failures:  number
+  // Conjuração
+  spellcasting_ability: string | null
+  spell_save_dc:        number | null
+  spell_attack_bonus:   number | null
+  // Narrativa
+  notes:              string | null
+  backstory:          string | null
+  personality_traits: string | null
+  ideals:             string | null
+  bonds:              string | null
+  flaws:              string | null
+  // Timestamps
+  created_at: string
+  updated_at: string
+}
+
+/** Campos atualizáveis da ficha D&D 5e (sem estruturais). */
+export type DndCharacterSheetUpdateInput = Partial<
+  Omit<DndCharacterSheet, 'id' | 'campaign_id' | 'user_id' | 'created_at' | 'updated_at'>
+>
+
 /** Dados públicos de um convite — retornados sem autenticação pela RPC get_campaign_invite_public */
 export interface CampaignInvitePublic {
   campaign_id: string

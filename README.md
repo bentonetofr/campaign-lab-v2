@@ -117,6 +117,16 @@ As migrations devem ser aplicadas **em ordem**, uma por vez, no **Supabase Dashb
 | 12 | `20240112000000_custom_dice_rolls.sql` | Adiciona `roll_breakdown jsonb`; ajusta limites de `quantity` (100) e `modifier` (±999); substitui trigger com validação matemática completa do breakdown |
 | 13 | `20240113000000_campaign_sessions.sql` | Tabela `campaign_sessions` (título, data, resumo, created_by); RLS — membros visualizam, mestre cria/edita/exclui; trigger `updated_at` |
 | 14 | `20240114000000_harden_campaign_sessions.sql` | Trigger `enforce_session_immutable_fields` — impede alteração de `campaign_id`, `created_by` e `created_at` após criação |
+| 15 | `20240115000000_campaign_notes.sql` | Tabela `campaign_notes`; RLS — todos os membros leem e criam, autor e mestre editam/excluem |
+| 16 | `20240116000000_harden_campaign_structural_fields.sql` | Endurece `create_campaign` com validação de `char_length`; trigger imutável para `campaign_id`/`user_id` em várias tabelas |
+| 17 | `20240117000000_campaign_activity.sql` | Tabela `campaign_activity`; RPC `create_campaign_activity`; trigger de atividade em membros/sessões/convites |
+| 18 | `20240118000000_my_campaigns.sql` | RPC `get_my_campaigns_with_role` — retorna campanhas com papel do usuário |
+| 19 | `20240119000000_campaign_presence.sql` | Tabela `campaign_presence`; RPC `upsert_campaign_presence` para heartbeat de presença online |
+| 20 | `20240120000000_campaign_notes.sql` | Ajustes adicionais em notas |
+| 21 | `20240121000000_my_sheets.sql` | Suporte a fichas do usuário em múltiplas campanhas |
+| 22 | `20240122000000_remove_custom_campaign_system.sql` | Remove sistema `custom` das campanhas; recria RPC `create_campaign` com sistemas válidos: `generic`, `dnd5e`, `altherium` |
+| 23 | `20240123000000_dnd_character_sheets_base.sql` | Tabela `dnd_character_sheets` — ficha D&D 5e completa; RLS; triggers de `updated_at` e campos estruturais imutáveis |
+| 24 | `20240125000000_dnd_abilities_saves.sql` | Idempotente: garante `player_name`, atributos (integer 1–30) e colunas `strength_save_proficient` etc. em `dnd_character_sheets` |
 
 > **Usuários criados antes da migration 1:** o trigger `handle_new_user` cria perfis apenas para novos cadastros. Para sincronizar usuários já existentes, rode o script de backfill comentado na seção 9 da migration 1.
 
@@ -145,11 +155,11 @@ Os sistemas são internos do Vorterium — usuários não criam sistemas persona
 | Sistema | ID | Ficha | Status |
 |---|---|---|---|
 | **Genérico** | `generic` | Ficha simples (atributos, PV, notas) | Disponível |
-| **D&D 5e** | `dnd5e` | Prévia visual completa (atributos, perícias, combate, inventário, magias) | Prévia |
+| **D&D 5e** | `dnd5e` | Ficha completa com persistência real no banco | Prévia |
 | **Altherium** | `altherium` | Sistema futuro do universo Altherium | Em breve |
 
 - **Genérico:** usa a ficha simples atual. Ideal para testes, one-shots ou sistemas caseiros.
-- **D&D 5e:** exibe a prévia visual da ficha com dados de demonstração (Kael Thorn, Guerreiro/Campeão nível 5). Persistência no banco será adicionada em atualização futura.
+- **D&D 5e:** ficha D&D 5e persistida no banco, com edição direta em linha (sem modo "editar" global). Inclui: cabeçalho editável (nome, classe, subclasse, espécie, antecedente, alinhamento, jogador, nível, XP), seis atributos com modificadores calculados automaticamente e botão de rolar teste, salvaguardas com proficiência clicável e botão de rolar, CA / iniciativa / deslocamento / proficiência editáveis, barra de PV com inputs de PV atual/máximo/temp, bolinhas de salvaguardas mortais clicáveis, inspiração clicável, abas Resumo / Combate / Traços / Anotações com edição direta. Banner "Alterações não salvas" aparece quando há mudanças; botões "Salvar alterações" e "Descartar" confirmam ou cancelam. Magias, inventário e perícias serão adicionados em incrementos futuros.
 - **Altherium:** a ficha própria do sistema Altherium será desenvolvida em atualização futura. Campanhas Altherium já podem ser criadas para validar a estrutura.
 
 O sistema de uma campanha é escolhido no momento da criação e **não pode ser alterado depois**.
@@ -197,9 +207,8 @@ O sistema de uma campanha é escolhido no momento da criação e **não pode ser
 - Chat em tempo real
 - Upload de imagem de capa ou avatar
 - Notificações
-- Ficha D&D 5e com persistência real no banco
+- Ficha D&D 5e — magias, inventário, perícias, ataques (próximos incrementos)
 - Ficha Altherium completa
-- Modificadores automáticos de atributos
 - Explorar campanhas públicas
 - Rolagem privada / dano oculto
 - Configurações de conta
@@ -295,7 +304,7 @@ Toda inserção em `campaign_members` acontece via RPC (`add_campaign_player`, `
 
 ```
 supabase/
-└── migrations/             ← 6 migrations em ordem
+└── migrations/             ← 23 migrations em ordem
 
 src/
 ├── app/
@@ -309,9 +318,15 @@ src/
 │   ├── members/            # CampaignMembersPanel + memberService
 │   ├── sheets/
 │   │   ├── components/     # SimpleSheetPanel, CampaignSheetPanel (roteador de sistemas)
-│   │   ├── dnd/            # Ficha D&D 5e — prévia visual (dados mock)
+│   │   ├── dnd/
+│   │   │   ├── services/   # dndSheetService (getMyDndSheet, ensureMyDndSheet, updateDndSheet)
+│   │   │   ├── DndCharacterSheetPanel.tsx  # Ficha D&D 5e real (dados do banco)
+│   │   │   ├── DndCharacterSheetPreview.tsx # Prévia visual com dados mock (referência)
+│   │   │   ├── DndCharacterSheet.css
+│   │   │   ├── mockCharacter.ts
+│   │   │   └── tabs/       # Componentes de aba (mock — referência)
 │   │   ├── altherium/      # Placeholder de ficha Altherium
-│   │   └── services/       # sheetService
+│   │   └── services/       # sheetService (ficha genérica)
 │   ├── dice/               # DiceRollerPanel + diceService
 │   ├── notes/              # CampaignNotesPanel + noteService
 │   ├── sessions/           # CampaignSessionsPanel + sessionService
@@ -323,7 +338,7 @@ src/
     ├── lib/supabase.ts      # Cliente Supabase
     ├── utils/authErrors.ts  # Tradução de erros de auth
     ├── utils/campaign.ts    # formatRole, getCampaignStatusLabel
-    └── types/index.ts       # Tipos do modelo de dados
+    └── types/index.ts       # Tipos: Campaign, CharacterSheet, DndCharacterSheet, DiceRoll…
 ```
 
 ---
