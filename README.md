@@ -138,6 +138,24 @@ npm run preview
 
 ---
 
+## Sistemas disponíveis
+
+Os sistemas são internos do Vorterium — usuários não criam sistemas personalizados. Novos sistemas são adicionados por atualizações da plataforma.
+
+| Sistema | ID | Ficha | Status |
+|---|---|---|---|
+| **Genérico** | `generic` | Ficha simples (atributos, PV, notas) | Disponível |
+| **D&D 5e** | `dnd5e` | Prévia visual completa (atributos, perícias, combate, inventário, magias) | Prévia |
+| **Altherium** | `altherium` | Sistema futuro do universo Altherium | Em breve |
+
+- **Genérico:** usa a ficha simples atual. Ideal para testes, one-shots ou sistemas caseiros.
+- **D&D 5e:** exibe a prévia visual da ficha com dados de demonstração (Kael Thorn, Guerreiro/Campeão nível 5). Persistência no banco será adicionada em atualização futura.
+- **Altherium:** a ficha própria do sistema Altherium será desenvolvida em atualização futura. Campanhas Altherium já podem ser criadas para validar a estrutura.
+
+O sistema de uma campanha é escolhido no momento da criação e **não pode ser alterado depois**.
+
+---
+
 ## O que está implementado no MVP
 
 | Feature | Status |
@@ -147,7 +165,7 @@ npm run preview
 | Login com Google (OAuth) | ✅ |
 | Logout | ✅ |
 | Perfis de usuário (profiles) | ✅ |
-| Criar campanha (sistema Genérico) | ✅ |
+| Criar campanha com seleção de sistema (Genérico / D&D 5e / Altherium) | ✅ |
 | Listar campanhas como mestre e jogador | ✅ |
 | Área da campanha por abas com aba "Visão geral" como padrão | ✅ |
 | Aba Membros com seções separadas (Mestre / Jogadores) | ✅ |
@@ -177,15 +195,13 @@ npm run preview
 ## O que está fora do MVP (futuras features)
 
 - Chat em tempo real
-- Presença online de membros
 - Upload de imagem de capa ou avatar
 - Notificações
-- Sistemas específicos (D&D, Altherium, Tormenta, Cthulhu etc.)
+- Ficha D&D 5e com persistência real no banco
+- Ficha Altherium completa
 - Modificadores automáticos de atributos
-- Classe de armadura / Mana / Perícias / Magias
 - Explorar campanhas públicas
 - Rolagem privada / dano oculto
-- Notas de sessão
 - Configurações de conta
 - Plano premium / monetização
 
@@ -291,14 +307,22 @@ src/
 │   ├── auth/               # AuthProvider, GuestRoute, ProtectedRoute, páginas de auth
 │   ├── campaigns/          # Listagem, criação, área da campanha, configurações + campaignService
 │   ├── members/            # CampaignMembersPanel + memberService
-│   ├── sheets/             # SimpleSheetPanel, SimpleSheetForm, CampaignSheetsList + sheetService
+│   ├── sheets/
+│   │   ├── components/     # SimpleSheetPanel, CampaignSheetPanel (roteador de sistemas)
+│   │   ├── dnd/            # Ficha D&D 5e — prévia visual (dados mock)
+│   │   ├── altherium/      # Placeholder de ficha Altherium
+│   │   └── services/       # sheetService
 │   ├── dice/               # DiceRollerPanel + diceService
+│   ├── notes/              # CampaignNotesPanel + noteService
+│   ├── sessions/           # CampaignSessionsPanel + sessionService
+│   ├── activity/           # CampaignActivityPanel, GlobalActivityPage + activityService
 │   └── users/              # profileService
 │
 └── shared/
+    ├── constants/systems.ts # Catálogo de sistemas (generic / dnd5e / altherium)
     ├── lib/supabase.ts      # Cliente Supabase
     ├── utils/authErrors.ts  # Tradução de erros de auth
-    ├── utils/campaign.ts    # formatSystem, formatRole
+    ├── utils/campaign.ts    # formatRole, getCampaignStatusLabel
     └── types/index.ts       # Tipos do modelo de dados
 ```
 

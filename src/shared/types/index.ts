@@ -2,6 +2,9 @@
 // Tipos do modelo de dados — Vorterium
 // ────────────────────────────────────────────────────────
 
+import type { CampaignSystem } from '../constants/systems'
+export type { CampaignSystem }
+
 export interface Profile {
   id: string
   display_name: string
@@ -23,7 +26,7 @@ export interface ProfilePublic {
 export interface Campaign {
   id: string
   name: string
-  system: string
+  system: CampaignSystem
   master_id: string
   description: string | null
   status: 'active' | 'paused' | 'archived'
@@ -195,7 +198,7 @@ export interface CampaignInvite {
 export interface CampaignInvitePublic {
   campaign_id: string
   campaign_name: string
-  campaign_system: string
+  campaign_system: CampaignSystem
   is_active: boolean
   expires_at: string | null
 }

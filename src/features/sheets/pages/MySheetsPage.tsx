@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getMySheets, isSheetFilled, type SheetWithCampaign } from '../services/sheetService'
+import { getSystemLabel } from '../../../shared/constants/systems'
 import './MySheetsPage.css'
 
 function formatRelativeTime(iso: string): string {
@@ -36,7 +37,7 @@ function SheetCard({ sheet, onNavigate }: SheetCardProps) {
           <p className="my-sheet-card__campaign">
             {sheet.campaign_name}
             {sheet.campaign_system && (
-              <span className="my-sheet-card__system"> · {sheet.campaign_system}</span>
+              <span className="my-sheet-card__system"> · {getSystemLabel(sheet.campaign_system)}</span>
             )}
           </p>
         </div>

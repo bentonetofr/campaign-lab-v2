@@ -1,6 +1,8 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { createCampaign } from '../services/campaignService'
+import { SYSTEMS_CATALOG, STATUS_LABELS, isSupportedSystem } from '../../../shared/constants/systems'
+import type { CampaignSystem } from '../../../shared/types'
 import './CampaignPages.css'
 
 const NAME_MAX        = 120
@@ -8,8 +10,10 @@ const DESCRIPTION_MAX = 1000
 
 export function NewCampaignPage() {
   const navigate = useNavigate()
+
   const [name,        setName]        = useState('')
   const [description, setDescription] = useState('')
+  const [system,      setSystem]      = useState<CampaignSystem>('generic')
   const [error,       setError]       = useState<string | null>(null)
   const [submitting,  setSubmitting]  = useState(false)
 
@@ -19,16 +23,19 @@ export function NewCampaignPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+
     const trimmedName = name.trim()
     if (!trimmedName) { setError('O nome da campanha não pode ser vazio.'); return }
     if (nameOver)     { setError(`O nome deve ter no máximo ${NAME_MAX} caracteres.`); return }
     if (descOver)     { setError(`A descrição deve ter no máximo ${DESCRIPTION_MAX} caracteres.`); return }
+    if (!isSupportedSystem(system)) { setError('Selecione um sistema válido.'); return }
 
     setSubmitting(true)
     try {
       const campaign = await createCampaign(
         trimmedName,
         description.trim() || null,
+        system,
       )
       navigate(`/campanhas/${campaign.id}`, { replace: true })
     } catch (err) {
@@ -50,7 +57,7 @@ export function NewCampaignPage() {
 
       <div className="page__content animate-fade-up" style={{ animationDelay: '60ms' }}>
         <div style={{
-          maxWidth: '520px',
+          maxWidth: '540px',
           background: 'var(--bg-surface)',
           border: '1px solid var(--gilded)',
           borderRadius: 'var(--radius-xl)',
@@ -78,15 +85,18 @@ export function NewCampaignPage() {
           )}
 
           <form onSubmit={handleSubmit} className="campaign-form" noValidate>
+            {/* Nome */}
             <div className="auth-field">
               <label className="label" htmlFor="campaign-name">Nome da campanha</label>
               <input
                 id="campaign-name" type="text"
                 className={`input${nameOver ? ' input--error' : ''}`}
-                placeholder="Ex: Minha primeira campanha"
+                placeholder="Ex: A Queda de Ironpeak"
                 autoComplete="off"
-                value={name} onChange={(e) => { setName(e.target.value); setError(null) }}
-                disabled={submitting} required
+                value={name}
+                onChange={(e) => { setName(e.target.value); setError(null) }}
+                disabled={submitting}
+                required
               />
               <span style={{
                 fontSize: 'var(--text-xs)',
@@ -98,15 +108,45 @@ export function NewCampaignPage() {
               </span>
             </div>
 
+            {/* Sistema */}
             <div className="auth-field">
-              <label className="label" htmlFor="campaign-system">Sistema de Regras</label>
-              <input
-                id="campaign-system" type="text" className="input"
-                value="Genérico" readOnly aria-readonly="true"
-                style={{ color: 'var(--text-muted)', cursor: 'default' }}
-              />
+              <span className="label">Sistema da campanha</span>
+              <div className="system-selector" role="radiogroup" aria-label="Sistema da campanha">
+                {SYSTEMS_CATALOG.map((sys) => {
+                  const isSelected = system === sys.id
+                  const statusLabel = STATUS_LABELS[sys.status]
+                  return (
+                    <button
+                      key={sys.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      className={`system-option${isSelected ? ' system-option--selected' : ''}`}
+                      onClick={() => { setSystem(sys.id); setError(null) }}
+                      disabled={submitting}
+                    >
+                      <div className="system-option__radio">
+                        <div className="system-option__radio-dot" />
+                      </div>
+                      <span className="system-option__icon" aria-hidden="true">{sys.icon}</span>
+                      <div className="system-option__info">
+                        <span className="system-option__name">
+                          {sys.label}
+                          {statusLabel && (
+                            <span className={`system-status-badge system-status-badge--${sys.status}`}>
+                              {statusLabel}
+                            </span>
+                          )}
+                        </span>
+                        <p className="system-option__desc">{sys.description}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
+            {/* Descrição */}
             <div className="auth-field">
               <label className="label" htmlFor="campaign-description">
                 Descrição <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span>
@@ -132,7 +172,11 @@ export function NewCampaignPage() {
 
             <div className="campaign-form__actions">
               <Link to="/campanhas" className="btn btn-ghost">Cancelar</Link>
-              <button type="submit" className="btn btn-primary" disabled={submitting || nameOver || descOver}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={submitting || nameOver || descOver}
+              >
                 {submitting
                   ? <><span className="spinner spinner--sm" /> Criando...</>
                   : 'Criar Campanha'

@@ -3,11 +3,12 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
 import { getCampaignWithRole } from '../services/campaignService'
 import { touchCampaignPresence } from '../../activity/services/activityService'
-import { formatSystem, formatRole, getCampaignStatusLabel, getCampaignStatusClass } from '../../../shared/utils/campaign'
+import { formatRole, getCampaignStatusLabel, getCampaignStatusClass } from '../../../shared/utils/campaign'
+import { getSystemLabel, getSystemStatus, STATUS_LABELS } from '../../../shared/constants/systems'
 import { CampaignOverviewPanel }  from '../components/CampaignOverviewPanel'
 import { CampaignMembersPanel }   from '../../members/components/CampaignMembersPanel'
 import { CampaignSessionsPanel }  from '../../sessions/components/CampaignSessionsPanel'
-import { SimpleSheetPanel }       from '../../sheets/components/SimpleSheetPanel'
+import { CampaignSheetPanel }     from '../../sheets/components/CampaignSheetPanel'
 import { DiceRollerPanel }        from '../../dice/components/DiceRollerPanel'
 import { CampaignSettingsPanel }  from '../components/CampaignSettingsPanel'
 import { CampaignActivityPanel }  from '../../activity/components/CampaignActivityPanel'
@@ -107,7 +108,12 @@ export function CampaignAreaPage() {
           <Link to="/campanhas" className="page__back">← Campanhas</Link>
           <h2 className="page__title">{campaign.name}</h2>
           <div className="campaign-area__header-meta">
-            <span className="badge">{formatSystem(campaign.system)}</span>
+            <span className="badge">{getSystemLabel(campaign.system)}</span>
+            {STATUS_LABELS[getSystemStatus(campaign.system)] && (
+              <span className={`system-status-badge system-status-badge--${getSystemStatus(campaign.system)}`}>
+                {STATUS_LABELS[getSystemStatus(campaign.system)]}
+              </span>
+            )}
             <span
               className={`campaign-card-role campaign-card-role--${campaign.role}`}
               style={{
@@ -203,9 +209,9 @@ export function CampaignAreaPage() {
         className="animate-fade-up"
       >
         {activeTab === 'ficha' && (
-          <SimpleSheetPanel
-            campaignId={campaign.id}
-            userRole={campaign.role}
+          <CampaignSheetPanel
+            campaign={campaign}
+            currentUserId={user!.id}
           />
         )}
       </div>

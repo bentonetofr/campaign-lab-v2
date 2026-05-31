@@ -1,6 +1,6 @@
 import { supabase } from '../../../shared/lib/supabase'
 import { logActivity } from '../../activity/services/activityService'
-import type { CharacterSheet, ProfilePublic, SheetWithProfile } from '../../../shared/types'
+import type { CharacterSheet, ProfilePublic, SheetWithProfile, CampaignSystem } from '../../../shared/types'
 
 // ────────────────────────────────────────────────────────
 // Constantes / utilidades
@@ -146,11 +146,11 @@ export async function updateSheet(
 
 export interface SheetWithCampaign extends CharacterSheet {
   campaign_name:   string
-  campaign_system: string
+  campaign_system: CampaignSystem
 }
 
 interface RawSheetWithCampaign extends CharacterSheet {
-  campaigns: { id: string; name: string; system: string } | null
+  campaigns: { id: string; name: string; system: CampaignSystem } | null
 }
 
 /**

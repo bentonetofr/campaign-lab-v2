@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
 import { getMyCampaigns } from '../services/campaignService'
-import { formatSystem, formatRole, getCampaignStatusLabel, getCampaignStatusClass } from '../../../shared/utils/campaign'
+import { formatRole, getCampaignStatusLabel, getCampaignStatusClass } from '../../../shared/utils/campaign'
+import { getSystemLabel, getSystemStatus, STATUS_LABELS } from '../../../shared/constants/systems'
 import type { CampaignWithRole } from '../../../shared/types'
 import './CampaignPages.css'
 
@@ -102,12 +103,20 @@ export function CampaignsPage() {
 }
 
 function CampaignCard({ campaign }: { campaign: CampaignWithRole }) {
+  const sysStatus      = getSystemStatus(campaign.system)
+  const sysStatusLabel = STATUS_LABELS[sysStatus]
+
   return (
     <div className="campaign-card-row">
       <div className="campaign-card-row__info">
         <span className="campaign-card-row__name">{campaign.name}</span>
         <div className="campaign-card-row__meta">
-          <span className="badge">{formatSystem(campaign.system)}</span>
+          <span className="badge">{getSystemLabel(campaign.system)}</span>
+          {sysStatusLabel && (
+            <span className={`system-status-badge system-status-badge--${sysStatus}`}>
+              {sysStatusLabel}
+            </span>
+          )}
           <span className={`campaign-card-role campaign-card-role--${campaign.role}`}>
             {formatRole(campaign.role)}
           </span>

@@ -5,6 +5,7 @@ import {
   deleteCampaign,
   leaveCampaign,
 } from '../services/campaignService'
+import { getSystemLabel, getSystemStatus, STATUS_LABELS } from '../../../shared/constants/systems'
 import type { CampaignWithRole } from '../../../shared/types'
 import './CampaignSettingsPanel.css'
 
@@ -162,6 +163,25 @@ export function CampaignSettingsPanel({ campaign, onCampaignUpdate }: CampaignSe
       </header>
 
       <div className="settings-panel__body">
+
+        {/* ── Sistema (somente leitura) ── */}
+        <div className="settings-panel__section">
+          <span className="settings-panel__section-label">Sistema</span>
+          <div className="settings-system-readonly">
+            <span className="settings-system-readonly__label">Sistema da campanha</span>
+            <span className="settings-system-readonly__value">
+              {getSystemLabel(campaign.system)}
+              {STATUS_LABELS[getSystemStatus(campaign.system)] && (
+                <span className={`system-status-badge system-status-badge--${getSystemStatus(campaign.system)}`}>
+                  {STATUS_LABELS[getSystemStatus(campaign.system)]}
+                </span>
+              )}
+            </span>
+            <span className="settings-system-readonly__hint">
+              Este campo não pode ser alterado após a criação da campanha.
+            </span>
+          </div>
+        </div>
 
         {/* ── Editar dados (mestre) ── */}
         {isMaster && (

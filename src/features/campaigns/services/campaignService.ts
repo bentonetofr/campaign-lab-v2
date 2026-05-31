@@ -1,7 +1,8 @@
 import { supabase } from '../../../shared/lib/supabase'
 import { ensureProfile } from '../../users/services/profileService'
 import { logActivity, createCampaignActivity } from '../../activity/services/activityService'
-import type { Campaign, CampaignMember, CampaignWithRole } from '../../../shared/types'
+import { isSupportedSystem } from '../../../shared/constants/systems'
+import type { Campaign, CampaignMember, CampaignWithRole, CampaignSystem } from '../../../shared/types'
 
 // ────────────────────────────────────────────────────────
 // Tipos de formulário
@@ -69,15 +70,20 @@ export async function getMyCampaigns(): Promise<CampaignWithRole[]> {
  * o que causaria falha na FK campaigns.master_id.
  */
 export async function createCampaign(
-  name: string,
-  description?: string | null
+  name:        string,
+  description?: string | null,
+  system:      CampaignSystem = 'generic',
 ): Promise<Campaign> {
+  if (!isSupportedSystem(system)) {
+    throw new Error('Selecione um sistema válido.')
+  }
+
   // Garante perfil antes de tentar criar campanha (FK constraint)
   await ensureProfile()
 
   const { data, error } = await supabase.rpc('create_campaign', {
     campaign_name:        name.trim(),
-    campaign_system:      'generic',
+    campaign_system:      system,
     campaign_description: description ?? null,
   })
 
@@ -85,6 +91,7 @@ export async function createCampaign(
     const msg = error.message ?? ''
     if (msg.includes('não pode ser vazio'))  throw new Error('O nome da campanha não pode ser vazio.')
     if (msg.includes('1000 caracteres'))     throw new Error('A descrição deve ter no máximo 1000 caracteres.')
+    if (msg.includes('Sistema inválido'))    throw new Error('Selecione um sistema válido.')
     throw new Error('Não foi possível criar a campanha. Tente novamente.')
   }
 
