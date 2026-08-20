@@ -12,6 +12,7 @@ export function PrivateLayout() {
     (user?.user_metadata?.display_name as string | undefined) ??
     user?.email ??
     '—'
+  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined
 
   const initial = displayName.trim().charAt(0).toUpperCase()
 
@@ -29,7 +30,9 @@ export function PrivateLayout() {
 
         {user && (
           <Link to="/perfil" className="sidebar__user sidebar__user--link">
-            <div className="sidebar__avatar" aria-hidden="true">{initial}</div>
+            <div className="sidebar__avatar" aria-hidden={avatarUrl ? undefined : true}>
+              {avatarUrl ? <img src={avatarUrl} alt="" /> : initial}
+            </div>
             <div className="sidebar__user-info">
               <span className="sidebar__user-name">{displayName}</span>
               {user.user_metadata?.display_name && (

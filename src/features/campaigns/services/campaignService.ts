@@ -147,7 +147,10 @@ export async function uploadCampaignCover(campaignId: string, file: File): Promi
       contentType: file.type,
     })
 
-  if (uploadError) throw new Error('Não foi possível enviar a capa. Verifique se a migration de mídia foi aplicada.')
+  if (uploadError) {
+    console.error('Erro do Storage ao enviar capa:', uploadError)
+    throw new Error(`Não foi possível enviar a capa: ${uploadError.message}`)
+  }
 
   const { data: publicData } = supabase.storage.from('campaign-covers').getPublicUrl(path)
   const coverUrl = `${publicData.publicUrl}?v=${Date.now()}`
@@ -168,7 +171,10 @@ export async function removeCampaignCover(campaignId: string): Promise<Campaign>
   const { error: removeError } = await supabase.storage
     .from('campaign-covers')
     .remove([`${campaignId}/cover`])
-  if (removeError) throw new Error('Não foi possível remover a capa da campanha.')
+  if (removeError) {
+    console.error('Erro do Storage ao remover capa:', removeError)
+    throw new Error(`Não foi possível remover a capa: ${removeError.message}`)
+  }
 
   const { data, error } = await supabase
     .from('campaigns')

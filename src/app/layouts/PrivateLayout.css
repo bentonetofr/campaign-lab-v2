@@ -57,6 +57,13 @@
   flex-shrink: 0;
 }
 
+.sidebar__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
 .sidebar__user-info { min-width: 0; flex: 1; }
 
 .sidebar__user-name {

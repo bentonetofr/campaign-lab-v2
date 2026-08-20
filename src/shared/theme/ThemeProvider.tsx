@@ -37,27 +37,36 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return saved === 'light' ? 'light' : 'dark'
   })
 
+  const [accountReady, setAccountReady] = useState(false)
+
   // Quando não há preferência local, recupera a preferência sincronizada
   // no perfil. O localStorage continua sendo usado para evitar flash visual.
   useEffect(() => {
-    if (localStorage.getItem(STORAGE_KEY)) return
+    let active = true
+    const hasLocalPreference = Boolean(localStorage.getItem(STORAGE_KEY))
+
     void (async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase
-        .from('profiles')
-        .select('theme_preference')
-        .eq('id', user.id)
-        .maybeSingle()
-      if (data?.theme_preference === 'light' || data?.theme_preference === 'dark') {
-        setTheme(data.theme_preference)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user && !hasLocalPreference) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('theme_preference')
+          .eq('id', session.user.id)
+          .maybeSingle()
+        if (active && (data?.theme_preference === 'light' || data?.theme_preference === 'dark')) {
+          setTheme(data.theme_preference)
+        }
       }
+      if (active) setAccountReady(true)
     })()
+
+    return () => { active = false }
   }, [])
 
   // Aplica o atributo no <html> e persiste
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
+    if (!accountReady) return
     localStorage.setItem(STORAGE_KEY, theme)
 
     void (async () => {
@@ -68,7 +77,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         .update({ theme_preference: theme })
         .eq('id', user.id)
     })()
-  }, [theme])
+  }, [theme, accountReady])
 
   function toggleTheme() {
     setTheme((t) => (t === 'dark' ? 'light' : 'dark'))

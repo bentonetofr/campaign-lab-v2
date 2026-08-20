@@ -61,6 +61,14 @@ export async function updateCurrentProfile(
     .single()
 
   if (error) throw new Error('Não foi possível atualizar o perfil.')
+
+  // Mantém os componentes que usam a sessão do Auth (sidebar e saudação)
+  // sincronizados imediatamente com o perfil persistido.
+  const { error: authUpdateError } = await supabase.auth.updateUser({
+    data: { display_name: displayName },
+  })
+  if (authUpdateError) console.warn('Perfil salvo, mas o nome da sessão não foi sincronizado.', authUpdateError)
+
   return updated as Profile
 }
 
@@ -86,12 +94,19 @@ export async function uploadCurrentAvatar(file: File): Promise<Profile> {
       contentType: file.type,
     })
 
-  if (uploadError) throw new Error('Não foi possível enviar o avatar. Verifique se a migration de mídia foi aplicada.')
+  if (uploadError) {
+    console.error('Erro do Storage ao enviar avatar:', uploadError)
+    throw new Error(`Não foi possível enviar o avatar: ${uploadError.message}`)
+  }
 
   const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(path)
   const avatarUrl = `${publicData.publicUrl}?v=${Date.now()}`
-
-  return updateProfileFields({ avatar_url: avatarUrl })
+  const updated = await updateProfileFields({ avatar_url: avatarUrl })
+  const { error: authUpdateError } = await supabase.auth.updateUser({
+    data: { avatar_url: avatarUrl },
+  })
+  if (authUpdateError) console.warn('Avatar salvo, mas a sessão não foi sincronizada.', authUpdateError)
+  return updated
 }
 
 /** Remove o avatar armazenado e limpa a URL pública do perfil. */
@@ -102,9 +117,17 @@ export async function removeCurrentAvatar(): Promise<Profile> {
   const { error: removeError } = await supabase.storage
     .from('avatars')
     .remove([`${user.id}/avatar`])
-  if (removeError) throw new Error('Não foi possível remover o avatar.')
+  if (removeError) {
+    console.error('Erro do Storage ao remover avatar:', removeError)
+    throw new Error(`Não foi possível remover o avatar: ${removeError.message}`)
+  }
 
-  return updateProfileFields({ avatar_url: null })
+  const updated = await updateProfileFields({ avatar_url: null })
+  const { error: authUpdateError } = await supabase.auth.updateUser({
+    data: { avatar_url: null },
+  })
+  if (authUpdateError) console.warn('Avatar removido, mas a sessão não foi sincronizada.', authUpdateError)
+  return updated
 }
 
 async function updateProfileFields(fields: { avatar_url: string | null; theme_preference?: 'dark' | 'light' }): Promise<Profile> {

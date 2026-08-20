@@ -40,9 +40,13 @@ function formatEntryDate(iso: string): string {
   })
 }
 
-function AvatarPlaceholder({ name }: { name: string }) {
+function AvatarPlaceholder({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
   const initial = name.trim().charAt(0).toUpperCase() || '?'
-  return <div className="member-avatar" aria-hidden="true">{initial}</div>
+  return (
+    <div className="member-avatar" aria-hidden={avatarUrl ? undefined : true}>
+      {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" /> : initial}
+    </div>
+  )
 }
 
 function SheetStatusBadge({ status }: { status: SheetStatus }) {
@@ -87,7 +91,7 @@ function MemberCard({
 
   return (
     <div className={`member-card ${isCurrentUser ? 'member-card--self' : ''}`}>
-      <AvatarPlaceholder name={member.profile.display_name} />
+      <AvatarPlaceholder name={member.profile.display_name} avatarUrl={member.profile.avatar_url} />
 
       <div className="member-card__info">
         <div className="member-card__name-row">

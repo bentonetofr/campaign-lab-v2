@@ -61,6 +61,15 @@ values
 on conflict (id) do update set public = excluded.public;
 
 -- Avatares: cada usuário só grava e remove o próprio caminho <uid>/avatar.
+drop policy if exists "avatars: usuário pode visualizar o próprio arquivo" on storage.objects;
+create policy "avatars: usuário pode visualizar o próprio arquivo"
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and name like auth.uid()::text || '/%'
+  );
+
 drop policy if exists "avatars: usuário pode enviar o próprio arquivo" on storage.objects;
 create policy "avatars: usuário pode enviar o próprio arquivo"
   on storage.objects for insert
@@ -94,6 +103,20 @@ create policy "avatars: usuário pode remover o próprio arquivo"
 
 -- Capas: somente o mestre da campanha grava, atualiza ou remove
 -- o caminho <campaign_id>/cover.
+drop policy if exists "campaign-covers: mestre pode visualizar capa" on storage.objects;
+create policy "campaign-covers: mestre pode visualizar capa"
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'campaign-covers'
+    and exists (
+      select 1
+      from public.campaign_members cm
+      where cm.campaign_id::text = split_part(name, '/', 1)
+        and cm.user_id = auth.uid()
+    )
+  );
+
 drop policy if exists "campaign-covers: mestre pode enviar capa" on storage.objects;
 create policy "campaign-covers: mestre pode enviar capa"
   on storage.objects for insert
