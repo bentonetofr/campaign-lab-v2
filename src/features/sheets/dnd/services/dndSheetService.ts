@@ -5,8 +5,16 @@
 import { supabase }    from '../../../../shared/lib/supabase'
 import { logActivity } from '../../../activity/services/activityService'
 import type {
+  DndCharacterAttack,
+  DndCharacterAttackInput,
+  DndCharacterInventoryInput,
+  DndCharacterInventoryItem,
+  DndCharacterSkill,
   DndCharacterSheet,
   DndCharacterSheetUpdateInput,
+  DndCharacterSpell,
+  DndCharacterSpellInput,
+  DndSheetDetails,
   ProfilePublic,
 } from '../../../../shared/types'
 
@@ -136,4 +144,94 @@ export async function updateDndSheet(
   logActivity(campaignId, 'sheet_updated', message)
 
   return sheet
+}
+
+/** Carrega os blocos repetíveis da ficha D&D. */
+export async function getDndSheetDetails(sheetId: string): Promise<DndSheetDetails> {
+  const [skills, attacks, inventory, spells] = await Promise.all([
+    supabase.from('dnd_character_skills').select('*').eq('sheet_id', sheetId),
+    supabase.from('dnd_character_attacks').select('*').eq('sheet_id', sheetId).order('sort_order', { ascending: true }),
+    supabase.from('dnd_character_inventory').select('*').eq('sheet_id', sheetId).order('sort_order', { ascending: true }),
+    supabase.from('dnd_character_spells').select('*').eq('sheet_id', sheetId).order('spell_level', { ascending: true }).order('sort_order', { ascending: true }),
+  ])
+
+  const firstError = [skills, attacks, inventory, spells].find((result) => result.error)?.error
+  if (firstError) {
+    console.error('Erro ao carregar detalhes da ficha D&D:', firstError)
+    throw new Error('Não foi possível carregar os detalhes da ficha D&D.')
+  }
+
+  return {
+    skills: (skills.data ?? []) as DndCharacterSkill[],
+    attacks: (attacks.data ?? []) as DndCharacterAttack[],
+    inventory: (inventory.data ?? []) as DndCharacterInventoryItem[],
+    spells: (spells.data ?? []) as DndCharacterSpell[],
+  }
+}
+
+/** Salva todas as proficiências exibidas na grade de perícias. */
+export async function upsertDndSkill(
+  sheetId: string,
+  skillKey: string,
+  proficient: boolean,
+  expertise: boolean,
+): Promise<DndCharacterSkill> {
+  const { data, error } = await supabase
+    .from('dnd_character_skills')
+    .upsert({ sheet_id: sheetId, skill_key: skillKey, proficient, expertise }, { onConflict: 'sheet_id,skill_key' })
+    .select('*')
+    .single()
+  if (error) throw new Error('Não foi possível salvar a perícia.')
+  return data as DndCharacterSkill
+}
+
+export async function createDndAttack(sheetId: string, input: DndCharacterAttackInput): Promise<DndCharacterAttack> {
+  const { data, error } = await supabase.from('dnd_character_attacks').insert({ sheet_id: sheetId, ...input }).select('*').single()
+  if (error) throw new Error('Não foi possível adicionar o ataque.')
+  return data as DndCharacterAttack
+}
+
+export async function updateDndAttack(id: string, input: Partial<DndCharacterAttackInput>): Promise<DndCharacterAttack> {
+  const { data, error } = await supabase.from('dnd_character_attacks').update(input).eq('id', id).select('*').single()
+  if (error) throw new Error('Não foi possível atualizar o ataque.')
+  return data as DndCharacterAttack
+}
+
+export async function deleteDndAttack(id: string): Promise<void> {
+  const { error } = await supabase.from('dnd_character_attacks').delete().eq('id', id)
+  if (error) throw new Error('Não foi possível remover o ataque.')
+}
+
+export async function createDndInventoryItem(sheetId: string, input: DndCharacterInventoryInput): Promise<DndCharacterInventoryItem> {
+  const { data, error } = await supabase.from('dnd_character_inventory').insert({ sheet_id: sheetId, ...input }).select('*').single()
+  if (error) throw new Error('Não foi possível adicionar o item.')
+  return data as DndCharacterInventoryItem
+}
+
+export async function updateDndInventoryItem(id: string, input: Partial<DndCharacterInventoryInput>): Promise<DndCharacterInventoryItem> {
+  const { data, error } = await supabase.from('dnd_character_inventory').update(input).eq('id', id).select('*').single()
+  if (error) throw new Error('Não foi possível atualizar o item.')
+  return data as DndCharacterInventoryItem
+}
+
+export async function deleteDndInventoryItem(id: string): Promise<void> {
+  const { error } = await supabase.from('dnd_character_inventory').delete().eq('id', id)
+  if (error) throw new Error('Não foi possível remover o item.')
+}
+
+export async function createDndSpell(sheetId: string, input: DndCharacterSpellInput): Promise<DndCharacterSpell> {
+  const { data, error } = await supabase.from('dnd_character_spells').insert({ sheet_id: sheetId, ...input }).select('*').single()
+  if (error) throw new Error('Não foi possível adicionar a magia.')
+  return data as DndCharacterSpell
+}
+
+export async function updateDndSpell(id: string, input: Partial<DndCharacterSpellInput>): Promise<DndCharacterSpell> {
+  const { data, error } = await supabase.from('dnd_character_spells').update(input).eq('id', id).select('*').single()
+  if (error) throw new Error('Não foi possível atualizar a magia.')
+  return data as DndCharacterSpell
+}
+
+export async function deleteDndSpell(id: string): Promise<void> {
+  const { error } = await supabase.from('dnd_character_spells').delete().eq('id', id)
+  if (error) throw new Error('Não foi possível remover a magia.')
 }

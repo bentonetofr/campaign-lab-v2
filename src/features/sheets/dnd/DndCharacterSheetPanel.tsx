@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ensureMyDndSheet, updateDndSheet } from './services/dndSheetService'
+import { ensureMyDndSheet, getDndSheetDetails, updateDndSheet } from './services/dndSheetService'
 import { rollDice } from '../../dice/services/diceService'
 import {
   getAbilityModifier,
@@ -11,7 +11,8 @@ import {
   getSavingThrowBonus,
   buildRollFormula,
 } from './utils/dndCalculations'
-import type { DndCharacterSheet, DndCharacterSheetUpdateInput } from '../../../shared/types'
+import type { DndCharacterSheet, DndCharacterSheetUpdateInput, DndSheetDetails } from '../../../shared/types'
+import { DndAttacksEditor, DndInventoryEditor, DndSkillsEditor, DndSpellsEditor } from './DndDetailsEditors'
 import './DndCharacterSheet.css'
 
 // ────────────────────────────────────────────────────────
@@ -234,7 +235,7 @@ function draftToUpdate(d: DndDraft): DndCharacterSheetUpdateInput {
 // Tipos internos
 // ────────────────────────────────────────────────────────
 
-type TabId = 'resumo' | 'combate' | 'magias' | 'inventario' | 'tracos' | 'anotacoes'
+type TabId = 'resumo' | 'combate' | 'pericias' | 'magias' | 'inventario' | 'tracos' | 'anotacoes'
 
 type SaveStatus = 'idle' | 'success' | 'error'
 
@@ -728,22 +729,12 @@ function DndAbilitiesColumn({ draft, errors, onChange, campaignId, rolling, onRo
 const TAB_LABELS: { id: TabId; label: string }[] = [
   { id: 'resumo',     label: 'Resumo'    },
   { id: 'combate',    label: 'Combate'   },
+  { id: 'pericias',   label: 'Perícias'  },
   { id: 'magias',     label: 'Magias'    },
   { id: 'inventario', label: 'Inventário'},
   { id: 'tracos',     label: 'Traços'    },
   { id: 'anotacoes',  label: 'Anotações' },
 ]
-
-function ComingSoonTab({ label }: { label: string }) {
-  return (
-    <div className="dnd-tab-content">
-      <p className="dnd-panel-state" style={{ padding: 'var(--space-6) 0' }}>
-        <span style={{ fontSize: '1.5rem', opacity: 0.3 }}>◎</span>
-        <span style={{ fontStyle: 'italic' }}>{label} — em desenvolvimento</span>
-      </p>
-    </div>
-  )
-}
 
 function TabResumo({ draft }: { draft: DndDraft }) {
   return (
@@ -788,7 +779,7 @@ function TabResumo({ draft }: { draft: DndDraft }) {
   )
 }
 
-function TabCombate({ draft }: { draft: DndDraft }) {
+function TabCombate({ sheetId, draft, details, onDetailsChange }: { sheetId: string; draft: DndDraft; details: DndSheetDetails; onDetailsChange: (details: DndSheetDetails) => void }) {
   const init = parseInt(draft.initiative_bonus, 10) || 0
   return (
     <div className="dnd-tab-content">
@@ -814,8 +805,11 @@ function TabCombate({ draft }: { draft: DndDraft }) {
           </span>
         </div>
       </div>
-      <p className="dnd-section-title" style={{ marginTop: 'var(--space-4)' }}>Ataques</p>
-      <p className="dnd-no-spells">Gerenciamento de ataques — em desenvolvimento</p>
+      <DndAttacksEditor
+        sheetId={sheetId}
+        details={details}
+        onDetailsChange={onDetailsChange}
+      />
     </div>
   )
 }
@@ -899,6 +893,7 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
   const [fieldErrors,setFieldErrors]= useState<FieldErrors>({})
   const [activeTab,  setActiveTab]  = useState<TabId>('resumo')
   const [rolling,    setRolling]    = useState<string | null>(null)
+  const [details,    setDetails]    = useState<DndSheetDetails>({ skills: [], attacks: [], inventory: [], spells: [] })
 
   // Auto-hide success banner
   const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -908,9 +903,11 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
     setLoading(true)
     setLoadError(null)
     ensureMyDndSheet(campaignId)
-      .then((s) => {
+      .then(async (s) => {
+        const loadedDetails = await getDndSheetDetails(s.id)
         setSheet(s)
         setDraft(sheetToDraft(s))
+        setDetails(loadedDetails)
         setIsDirty(false)
       })
       .catch((err) => setLoadError(err instanceof Error ? err.message : 'Erro ao carregar a ficha.'))
@@ -995,7 +992,7 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
     )
   }
 
-  if (!draft) return null
+  if (!draft || !sheet) return null
 
   return (
     <div className="dnd-sheet">
@@ -1056,9 +1053,10 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
           </nav>
 
           {activeTab === 'resumo'     && <TabResumo    draft={draft} />}
-          {activeTab === 'combate'    && <TabCombate   draft={draft} />}
-          {activeTab === 'magias'     && <ComingSoonTab label="Magias" />}
-          {activeTab === 'inventario' && <ComingSoonTab label="Inventário" />}
+          {activeTab === 'combate'    && <TabCombate sheetId={sheet.id} draft={draft} details={details} onDetailsChange={setDetails} />}
+          {activeTab === 'pericias'   && <DndSkillsEditor sheetId={sheet.id} details={details} onDetailsChange={setDetails} draft={draft as unknown as Record<string, string>} />}
+          {activeTab === 'magias'     && <DndSpellsEditor sheetId={sheet.id} details={details} onDetailsChange={setDetails} />}
+          {activeTab === 'inventario' && <DndInventoryEditor sheetId={sheet.id} details={details} onDetailsChange={setDetails} />}
           {activeTab === 'tracos'     && <TabTracos    draft={draft} onChange={handleChange} />}
           {activeTab === 'anotacoes'  && <TabAnotacoes draft={draft} onChange={handleChange} />}
         </div>

@@ -37,11 +37,12 @@ O schema atual contém:
 
 - `profiles`, `campaigns` e `campaign_members`;
 - `campaign_invites`, `campaign_sessions` e `campaign_notes`;
-- `character_sheets` e `dnd_character_sheets`;
+- `character_sheets`, `dnd_character_sheets` e os detalhes D&D (`dnd_character_skills`,
+  `dnd_character_attacks`, `dnd_character_inventory`, `dnd_character_spells`);
 - `dice_rolls`, `campaign_activity` e `campaign_presence`;
 - buckets públicos `avatars` e `campaign-covers`, com escrita protegida por RLS.
 
-O contrato canônico contém 24 migrations SQL. A verificação local é executada com:
+O contrato canônico contém 25 migrations SQL. A verificação local é executada com:
 
 ```bash
 npm run verify

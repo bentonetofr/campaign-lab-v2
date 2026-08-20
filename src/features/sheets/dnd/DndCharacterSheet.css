@@ -1513,6 +1513,163 @@
   padding-top: var(--space-2);
 }
 
+/* ── Conteúdo estruturado da ficha ── */
+
+.dnd-detail-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.dnd-detail-hint,
+.dnd-detail-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.dnd-detail-error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid rgba(255, 180, 171, 0.4);
+  border-radius: var(--radius-md);
+  background: rgba(255, 180, 171, 0.07);
+  color: #ffb4ab;
+  font-size: var(--text-sm);
+}
+
+.dnd-skills-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-md);
+  background: var(--border-dim);
+}
+
+.dnd-skill-editor-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px 38px auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+}
+
+.dnd-skill-editor-row__name {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dnd-skill-editor-row__ability,
+.dnd-skill-editor-row__bonus {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+.dnd-skill-editor-row__bonus {
+  color: var(--accent-bright);
+  font-weight: 700;
+}
+
+.dnd-detail-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.dnd-detail-check input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent-bright);
+}
+
+.dnd-detail-form {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+
+.dnd-detail-form--attack { grid-template-columns: minmax(150px, 2fr) repeat(3, minmax(70px, 1fr)) auto; }
+.dnd-detail-form--inventory { grid-template-columns: minmax(150px, 2fr) 70px 80px auto auto; align-items: center; }
+.dnd-detail-form--spell { grid-template-columns: minmax(150px, 2fr) 90px minmax(100px, 1fr) minmax(130px, 1fr) auto; }
+
+.dnd-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.dnd-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.dnd-detail-card__grid {
+  display: grid;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.dnd-detail-card__grid--attack { grid-template-columns: minmax(150px, 2fr) repeat(3, minmax(70px, 1fr)); }
+.dnd-detail-card__grid--inventory { grid-template-columns: minmax(150px, 2fr) 70px 80px auto; }
+.dnd-detail-card__grid--spell { grid-template-columns: minmax(140px, 2fr) 90px minmax(100px, 1fr) minmax(130px, 1fr) auto auto; }
+
+.dnd-detail-card__topline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.dnd-detail-card__topline strong { color: var(--accent-bright); font-family: var(--font-display); font-size: var(--text-md); }
+
+.dnd-detail-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.dnd-detail-danger { color: #ffb4ab; }
+
+@media (max-width: 900px) {
+  .dnd-skills-editor { grid-template-columns: 1fr; }
+  .dnd-detail-form--attack,
+  .dnd-detail-form--inventory,
+  .dnd-detail-form--spell,
+  .dnd-detail-card__grid--attack,
+  .dnd-detail-card__grid--inventory,
+  .dnd-detail-card__grid--spell { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dnd-detail-form > .btn,
+  .dnd-detail-card__actions { grid-column: 1 / -1; }
+}
+
+@media (max-width: 520px) {
+  .dnd-skill-editor-row { grid-template-columns: minmax(0, 1fr) 36px 32px; }
+  .dnd-skill-editor-row .dnd-detail-check { grid-column: span 1; }
+}
+
 /* ═══════════════════════════════════════════════════════
    Light mode overrides
    ═══════════════════════════════════════════════════════ */

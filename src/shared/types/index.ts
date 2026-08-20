@@ -262,6 +262,103 @@ export type DndCharacterSheetUpdateInput = Partial<
   Omit<DndCharacterSheet, 'id' | 'campaign_id' | 'user_id' | 'created_at' | 'updated_at'>
 >
 
+export const DND_SKILLS = [
+  { key: 'acrobatics', label: 'Acrobacia', ability: 'dexterity' },
+  { key: 'animal_handling', label: 'Adestrar Animais', ability: 'wisdom' },
+  { key: 'arcana', label: 'Arcanismo', ability: 'intelligence' },
+  { key: 'athletics', label: 'Atletismo', ability: 'strength' },
+  { key: 'deception', label: 'Enganação', ability: 'charisma' },
+  { key: 'history', label: 'História', ability: 'intelligence' },
+  { key: 'insight', label: 'Intuição', ability: 'wisdom' },
+  { key: 'intimidation', label: 'Intimidação', ability: 'charisma' },
+  { key: 'investigation', label: 'Investigação', ability: 'intelligence' },
+  { key: 'medicine', label: 'Medicina', ability: 'wisdom' },
+  { key: 'nature', label: 'Natureza', ability: 'intelligence' },
+  { key: 'perception', label: 'Percepção', ability: 'wisdom' },
+  { key: 'performance', label: 'Atuação', ability: 'charisma' },
+  { key: 'persuasion', label: 'Persuasão', ability: 'charisma' },
+  { key: 'religion', label: 'Religião', ability: 'intelligence' },
+  { key: 'sleight_of_hand', label: 'Prestidigitação', ability: 'dexterity' },
+  { key: 'stealth', label: 'Furtividade', ability: 'dexterity' },
+  { key: 'survival', label: 'Sobrevivência', ability: 'wisdom' },
+] as const
+
+export type DndSkillKey = typeof DND_SKILLS[number]['key']
+
+export interface DndCharacterSkill {
+  id: string
+  sheet_id: string
+  skill_key: DndSkillKey
+  proficient: boolean
+  expertise: boolean
+}
+
+export interface DndCharacterAttack {
+  id: string
+  sheet_id: string
+  name: string
+  attack_bonus: string
+  damage: string
+  damage_type: string
+  notes: string
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export type DndCharacterAttackInput = Omit<
+  DndCharacterAttack,
+  'id' | 'sheet_id' | 'created_at' | 'updated_at'
+>
+
+export interface DndCharacterInventoryItem {
+  id: string
+  sheet_id: string
+  name: string
+  quantity: number
+  weight: number
+  equipped: boolean
+  notes: string
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export type DndCharacterInventoryInput = Omit<
+  DndCharacterInventoryItem,
+  'id' | 'sheet_id' | 'created_at' | 'updated_at'
+>
+
+export interface DndCharacterSpell {
+  id: string
+  sheet_id: string
+  name: string
+  spell_level: number
+  school: string
+  casting_time: string
+  spell_range: string
+  duration: string
+  concentration: boolean
+  ritual: boolean
+  prepared: boolean
+  description: string
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export type DndCharacterSpellInput = Omit<
+  DndCharacterSpell,
+  'id' | 'sheet_id' | 'created_at' | 'updated_at'
+>
+
+export interface DndSheetDetails {
+  skills: DndCharacterSkill[]
+  attacks: DndCharacterAttack[]
+  inventory: DndCharacterInventoryItem[]
+  spells: DndCharacterSpell[]
+}
+
 /** Dados públicos de um convite — retornados sem autenticação pela RPC get_campaign_invite_public */
 export interface CampaignInvitePublic {
   campaign_id: string
