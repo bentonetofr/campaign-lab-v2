@@ -1,12 +1,15 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  AVATAR_MAX_BYTES,
+  AVATAR_TYPES,
   ensureProfile,
   removeCurrentAvatar,
   updateCurrentPassword,
   updateCurrentProfile,
   uploadCurrentAvatar,
 } from '../services/profileService'
+import { AvatarCropEditor } from '../components/AvatarCropEditor'
 import type { Profile } from '../../../shared/types'
 import { useTheme } from '../../../shared/theme/ThemeProvider'
 import '../../../features/campaigns/pages/CampaignPages.css'
@@ -39,6 +42,7 @@ export function ProfilePage() {
 
   const [avatarBusy, setAvatarBusy]   = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
+  const [avatarDraft, setAvatarDraft] = useState<File | null>(null)
 
   const [password, setPassword]             = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
@@ -89,10 +93,26 @@ export function ProfilePage() {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
+
+    setAvatarError(null)
+    if (!AVATAR_TYPES.includes(file.type as (typeof AVATAR_TYPES)[number])) {
+      setAvatarError('Escolha uma imagem JPG, PNG ou WebP.')
+      return
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      setAvatarError('O avatar deve ter no máximo 2 MB.')
+      return
+    }
+
+    setAvatarDraft(file)
+  }
+
+  async function handleAvatarSave(file: File) {
     setAvatarError(null)
     setAvatarBusy(true)
     try {
       setProfile(await uploadCurrentAvatar(file))
+      setAvatarDraft(null)
     } catch (err) {
       setAvatarError(err instanceof Error ? err.message : 'Não foi possível atualizar o avatar.')
     } finally {
@@ -187,7 +207,7 @@ export function ProfilePage() {
               <span>JPG, PNG ou WebP · máximo de 2 MB</span>
               <div className="profile-avatar-editor__actions">
                 <label className="btn btn-ghost">
-                  {avatarBusy ? 'Enviando...' : 'Escolher avatar'}
+                  Escolher imagem
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
@@ -209,6 +229,15 @@ export function ProfilePage() {
               </div>
             </div>
           </div>
+
+          {avatarDraft && (
+            <AvatarCropEditor
+              file={avatarDraft}
+              saving={avatarBusy}
+              onCancel={() => setAvatarDraft(null)}
+              onSave={handleAvatarSave}
+            />
+          )}
 
           {avatarError && (
             <p className="profile-msg profile-msg--error" role="alert">{avatarError}</p>
