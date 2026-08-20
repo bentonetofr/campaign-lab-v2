@@ -42,11 +42,13 @@
 }
 
 .sidebar__avatar {
+  position: relative;
   width: 38px;
   height: 38px;
-  border-radius: var(--radius-md);
+  overflow: hidden;
+  border-radius: 50%;
   background: var(--bg-overlay);
-  border: 1px solid var(--gilded);
+  border: 2px solid var(--gilded);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -55,13 +57,15 @@
   font-weight: 700;
   color: var(--accent-bright);
   flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.12), 0 3px 10px rgba(0, 0, 0, 0.28);
 }
 
 .sidebar__avatar img {
   width: 100%;
   height: 100%;
+  display: block;
   object-fit: cover;
-  border-radius: inherit;
+  object-position: center;
 }
 
 .sidebar__user-info { min-width: 0; flex: 1; }
