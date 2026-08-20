@@ -1,0 +1,71 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+const migrationDirectory = resolve(process.cwd(), 'supabase', 'migrations')
+
+const expectedMigrations = [
+  '20240101000000_initial_schema.sql',
+  '20240102000000_campaign_members.sql',
+  '20240103000000_harden_campaign_members_insert.sql',
+  '20240104000000_character_sheets.sql',
+  '20240105000000_dice_rolls.sql',
+  '20240106000000_harden_character_sheets_and_dice.sql',
+  '20240107000000_allow_profile_self_insert.sql',
+  '20240108000000_campaign_invites.sql',
+  '20240109000000_improve_campaign_invites.sql',
+  '20240110000000_campaign_management.sql',
+  '20240111000000_improve_dice_rolls.sql',
+  '20240112000000_custom_dice_rolls.sql',
+  '20240113000000_campaign_sessions.sql',
+  '20240114000000_harden_campaign_sessions.sql',
+  '20240115000000_campaign_description_status.sql',
+  '20240116000000_harden_campaign_structural_fields.sql',
+  '20240117000000_campaign_activity_presence.sql',
+  '20240118000000_harden_campaign_activity_rpc.sql',
+  '20240119000000_session_status.sql',
+  '20240120000000_campaign_notes.sql',
+  '20240122000000_remove_custom_campaign_system.sql',
+  '20240123000000_dnd_character_sheets_base.sql',
+  '20240125000000_dnd_abilities_saves.sql',
+]
+
+const actualMigrations = readdirSync(migrationDirectory)
+  .filter((fileName) => fileName.endsWith('.sql'))
+  .sort()
+
+const errors = []
+
+if (actualMigrations.length !== expectedMigrations.length) {
+  errors.push(
+    `Quantidade inesperada: encontrado ${actualMigrations.length}, esperado ${expectedMigrations.length}.`,
+  )
+}
+
+if (actualMigrations.some((fileName, index) => fileName !== expectedMigrations[index])) {
+  errors.push('A ordem lexicográfica das migrations não corresponde ao contrato registrado.')
+}
+
+const expectedSet = new Set(expectedMigrations)
+const actualSet = new Set(actualMigrations)
+
+for (const fileName of expectedMigrations) {
+  if (!actualSet.has(fileName)) errors.push(`Migration ausente: ${fileName}`)
+}
+
+for (const fileName of actualMigrations) {
+  if (!expectedSet.has(fileName)) errors.push(`Migration não registrada: ${fileName}`)
+}
+
+for (const fileName of actualMigrations) {
+  const path = resolve(migrationDirectory, fileName)
+  if (statSync(path).size === 0) errors.push(`Migration vazia: ${fileName}`)
+  if (!readFileSync(path, 'utf8').trim()) errors.push(`Migration sem conteúdo: ${fileName}`)
+}
+
+if (errors.length > 0) {
+  console.error('Contrato de migrations inválido:')
+  for (const error of errors) console.error(`- ${error}`)
+  process.exit(1)
+}
+
+console.log(`Contrato de migrations OK: ${actualMigrations.length} arquivos em ordem.`)

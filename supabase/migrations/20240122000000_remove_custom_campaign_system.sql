@@ -1,7 +1,7 @@
 -- ============================================================
 -- Vorterium — Remover sistema "custom" de campanhas
 -- Migration: 20240122000000_remove_custom_campaign_system.sql
--- Aplicar após: 20240121000000 (se existir) ou 20240120000000
+-- Aplicar após: 20240120000000_campaign_notes.sql
 -- Aplicar em: Supabase Dashboard → SQL Editor
 --
 -- Sistemas permitidos após esta migration:

@@ -101,6 +101,11 @@ Authentication → URL Configuration
 
 As migrations devem ser aplicadas **em ordem**, uma por vez, no **Supabase Dashboard → SQL Editor → New query**.
 
+O repositório contém **23 migrations SQL**. A lista abaixo é o contrato canônico da
+ordem de aplicação; não existe uma migration `20240121000000_my_sheets.sql` neste
+repositório e ela não deve ser criada ou aplicada sem uma decisão explícita de
+schema.
+
 | # | Arquivo | O que faz |
 |---|---|---|
 | 1  | `20240101000000_initial_schema.sql` | Tabelas `profiles`, `campaigns`, `campaign_members`; triggers; RLS; RPCs `create_campaign`, `is_campaign_member`, `is_campaign_master` |
@@ -117,16 +122,15 @@ As migrations devem ser aplicadas **em ordem**, uma por vez, no **Supabase Dashb
 | 12 | `20240112000000_custom_dice_rolls.sql` | Adiciona `roll_breakdown jsonb`; ajusta limites de `quantity` (100) e `modifier` (±999); substitui trigger com validação matemática completa do breakdown |
 | 13 | `20240113000000_campaign_sessions.sql` | Tabela `campaign_sessions` (título, data, resumo, created_by); RLS — membros visualizam, mestre cria/edita/exclui; trigger `updated_at` |
 | 14 | `20240114000000_harden_campaign_sessions.sql` | Trigger `enforce_session_immutable_fields` — impede alteração de `campaign_id`, `created_by` e `created_at` após criação |
-| 15 | `20240115000000_campaign_notes.sql` | Tabela `campaign_notes`; RLS — todos os membros leem e criam, autor e mestre editam/excluem |
+| 15 | `20240115000000_campaign_description_status.sql` | Adiciona descrição e status à campanha; recria as RPCs de criação e atualização com validações |
 | 16 | `20240116000000_harden_campaign_structural_fields.sql` | Endurece `create_campaign` com validação de `char_length`; trigger imutável para `campaign_id`/`user_id` em várias tabelas |
-| 17 | `20240117000000_campaign_activity.sql` | Tabela `campaign_activity`; RPC `create_campaign_activity`; trigger de atividade em membros/sessões/convites |
-| 18 | `20240118000000_my_campaigns.sql` | RPC `get_my_campaigns_with_role` — retorna campanhas com papel do usuário |
-| 19 | `20240119000000_campaign_presence.sql` | Tabela `campaign_presence`; RPC `upsert_campaign_presence` para heartbeat de presença online |
-| 20 | `20240120000000_campaign_notes.sql` | Ajustes adicionais em notas |
-| 21 | `20240121000000_my_sheets.sql` | Suporte a fichas do usuário em múltiplas campanhas |
-| 22 | `20240122000000_remove_custom_campaign_system.sql` | Remove sistema `custom` das campanhas; recria RPC `create_campaign` com sistemas válidos: `generic`, `dnd5e`, `altherium` |
-| 23 | `20240123000000_dnd_character_sheets_base.sql` | Tabela `dnd_character_sheets` — ficha D&D 5e completa; RLS; triggers de `updated_at` e campos estruturais imutáveis |
-| 24 | `20240125000000_dnd_abilities_saves.sql` | Idempotente: garante `player_name`, atributos (integer 1–30) e colunas `strength_save_proficient` etc. em `dnd_character_sheets` |
+| 17 | `20240117000000_campaign_activity_presence.sql` | Tabelas `campaign_activity` e `campaign_presence`; RPCs para registrar atividade e heartbeat de presença |
+| 18 | `20240118000000_harden_campaign_activity_rpc.sql` | Endurece `create_campaign_activity` para impedir que jogadores forjem eventos administrativos |
+| 19 | `20240119000000_session_status.sql` | Adiciona status `planned`, `completed` e `canceled` às sessões |
+| 20 | `20240120000000_campaign_notes.sql` | Tabela `campaign_notes`; RLS — membros leem e criam, autor e mestre editam/excluem; tipos de atividade de notas |
+| 21 | `20240122000000_remove_custom_campaign_system.sql` | Remove sistema `custom` das campanhas; recria RPC `create_campaign` com sistemas válidos: `generic`, `dnd5e`, `altherium` |
+| 22 | `20240123000000_dnd_character_sheets_base.sql` | Tabela `dnd_character_sheets` — ficha D&D 5e base; RLS; triggers de `updated_at` e campos estruturais imutáveis |
+| 23 | `20240125000000_dnd_abilities_saves.sql` | Idempotente: garante `player_name`, atributos (integer 1–30) e colunas `strength_save_proficient` etc. em `dnd_character_sheets` |
 
 > **Usuários criados antes da migration 1:** o trigger `handle_new_user` cria perfis apenas para novos cadastros. Para sincronizar usuários já existentes, rode o script de backfill comentado na seção 9 da migration 1.
 
@@ -145,6 +149,16 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+### Verificação local do contrato
+
+Antes de abrir um deploy ou adicionar uma migration, execute:
+
+```bash
+npm run verify
+```
+
+O comando valida as 23 migrations registradas e depois executa o build de produção.
 
 ---
 

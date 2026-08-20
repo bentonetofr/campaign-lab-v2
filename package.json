@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:migrations": "node scripts/verify-migrations.mjs",
+    "verify": "npm run verify:migrations && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.43.0",
