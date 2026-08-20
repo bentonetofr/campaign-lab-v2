@@ -101,7 +101,7 @@ Authentication → URL Configuration
 
 As migrations devem ser aplicadas **em ordem**, uma por vez, no **Supabase Dashboard → SQL Editor → New query**.
 
-O repositório contém **26 migrations SQL**. A lista abaixo é o contrato canônico da
+O repositório contém **27 migrations SQL**. A lista abaixo é o contrato canônico da
 ordem de aplicação; não existe uma migration `20240121000000_my_sheets.sql` neste
 repositório e ela não deve ser criada ou aplicada sem uma decisão explícita de
 schema.
@@ -134,6 +134,7 @@ schema.
 | 24 | `20240126000000_profile_preferences_and_media.sql` | Preferência de tema, URL de capa da campanha, buckets `avatars`/`campaign-covers` e policies de Storage |
 | 25 | `20240127000000_dnd_sheet_details.sql` | Perícias, ataques, inventário e magias da ficha D&D 5e, com índices, triggers e RLS |
 | 26 | `20240128000000_dnd_rules_engine.sql` | Catálogo D&D 5e 2014, escolhas oficiais, proficiências adicionais e sobrescritas manuais de campos calculados |
+| 27 | `20240129000000_dnd_equipment_catalog.sql` | Catálogo estruturado de armas, armaduras, itens de aventura e ferramentas para a ficha D&D 5e |
 
 > **Usuários criados antes da migration 1:** o trigger `handle_new_user` cria perfis apenas para novos cadastros. Para sincronizar usuários já existentes, rode o script de backfill comentado na seção 9 da migration 1.
 
@@ -161,7 +162,7 @@ Antes de abrir um deploy ou adicionar uma migration, execute:
 npm run verify
 ```
 
-O comando valida as 26 migrations registradas e depois executa o build de produção.
+O comando valida as 27 migrations registradas e depois executa o build de produção.
 
 ---
 
@@ -321,7 +322,7 @@ Toda inserção em `campaign_members` acontece via RPC (`add_campaign_player`, `
 
 ```
 supabase/
-└── migrations/             ← 26 migrations em ordem
+└── migrations/             ← 27 migrations em ordem
 
 src/
 ├── app/

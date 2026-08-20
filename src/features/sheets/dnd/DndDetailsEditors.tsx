@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   DND_SKILLS,
   type DndCharacterAttack,
@@ -7,6 +7,7 @@ import {
   type DndCharacterInventoryItem,
   type DndCharacterSpell,
   type DndCharacterSpellInput,
+  type DndRuleCatalogEntry,
   type DndSheetDetails,
   type DndSkillKey,
 } from '../../../shared/types'
@@ -17,6 +18,7 @@ import {
   deleteDndAttack,
   deleteDndInventoryItem,
   deleteDndSpell,
+  getDndCatalogEntries,
   updateDndAttack,
   updateDndInventoryItem,
   updateDndSpell,
@@ -36,6 +38,17 @@ function DetailMessage({ error }: { error: string | null }) {
 
 function replaceItem<T extends { id: string }>(items: T[], next: T): T[] {
   return items.map((item) => item.id === next.id ? next : item)
+}
+
+function metadataText(entry: DndRuleCatalogEntry, key: string): string {
+  const value = entry.metadata[key]
+  return typeof value === 'string' ? value : ''
+}
+
+function CatalogStatus({ loading, count }: { loading: boolean; count: number }) {
+  if (loading) return <span className="dnd-catalog-status">Carregando catálogo…</span>
+  if (!count) return <span className="dnd-catalog-status">Catálogo não aplicado no Supabase</span>
+  return <span className="dnd-catalog-status">{count} opções do livro</span>
 }
 
 function SkillEditor({ sheetId, details, onDetailsChange, draft }: DetailsProps & {
@@ -109,11 +122,33 @@ function SkillEditor({ sheetId, details, onDetailsChange, draft }: DetailsProps 
 }
 
 function AttacksEditor({ sheetId, details, onDetailsChange }: DetailsProps) {
-  const empty: DndCharacterAttackInput = { name: '', attack_bonus: '', damage: '', damage_type: '', notes: '', sort_order: details.attacks.length }
+  const empty: DndCharacterAttackInput = { name: '', attack_bonus: '', damage: '', damage_type: '', notes: '', catalog_entry_key: null, sort_order: details.attacks.length }
   const [newAttack, setNewAttack] = useState(empty)
   const [edits, setEdits] = useState<Record<string, Partial<DndCharacterAttackInput>>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [catalog, setCatalog] = useState<DndRuleCatalogEntry[]>([])
+  const [catalogLoading, setCatalogLoading] = useState(true)
+
+  useEffect(() => {
+    getDndCatalogEntries(['weapon'])
+      .then(setCatalog)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Não foi possível carregar as armas.'))
+      .finally(() => setCatalogLoading(false))
+  }, [])
+
+  function selectWeapon(entryKey: string) {
+    const entry = catalog.find((item) => item.entry_key === entryKey)
+    if (!entry) return
+    setNewAttack((current) => ({
+      ...current,
+      catalog_entry_key: entry.entry_key,
+      name: entry.name,
+      damage: metadataText(entry, 'damage'),
+      damage_type: metadataText(entry, 'damage_type'),
+      notes: [entry.description, metadataText(entry, 'cost'), ((entry.metadata.properties as string[] | undefined) ?? []).join(', ')].filter(Boolean).join(' · '),
+    }))
+  }
 
   async function addAttack() {
     if (!newAttack.name.trim()) { setError('Informe o nome do ataque.'); return }
@@ -155,11 +190,16 @@ function AttacksEditor({ sheetId, details, onDetailsChange }: DetailsProps) {
       <p className="dnd-section-title">Ataques</p>
       <DetailMessage error={error} />
       <div className="dnd-detail-form dnd-detail-form--attack">
+        <select className="dnd-edit-input" defaultValue="" onChange={(e) => selectWeapon(e.target.value)}>
+          <option value="">Escolher arma do catálogo</option>
+          {catalog.map((entry) => <option key={entry.entry_key} value={entry.entry_key}>{entry.name}</option>)}
+        </select>
         <input className="dnd-edit-input" placeholder="Nome (ex.: Espada longa)" value={newAttack.name} onChange={(e) => setNewAttack({ ...newAttack, name: e.target.value })} />
         <input className="dnd-edit-input" placeholder="Bônus" value={newAttack.attack_bonus} onChange={(e) => setNewAttack({ ...newAttack, attack_bonus: e.target.value })} />
         <input className="dnd-edit-input" placeholder="Dano" value={newAttack.damage} onChange={(e) => setNewAttack({ ...newAttack, damage: e.target.value })} />
         <input className="dnd-edit-input" placeholder="Tipo" value={newAttack.damage_type} onChange={(e) => setNewAttack({ ...newAttack, damage_type: e.target.value })} />
         <button type="button" className="btn btn-primary" onClick={() => void addAttack()} disabled={busy !== null}>Adicionar</button>
+        <CatalogStatus loading={catalogLoading} count={catalog.length} />
       </div>
       {details.attacks.length === 0 && <p className="dnd-detail-empty">Nenhum ataque cadastrado.</p>}
       <div className="dnd-detail-list">
@@ -186,11 +226,34 @@ function AttacksEditor({ sheetId, details, onDetailsChange }: DetailsProps) {
 }
 
 function InventoryEditor({ sheetId, details, onDetailsChange }: DetailsProps) {
-  const empty: DndCharacterInventoryInput = { name: '', quantity: 1, weight: 0, equipped: false, notes: '', sort_order: details.inventory.length }
+  const empty: DndCharacterInventoryInput = { name: '', quantity: 1, weight: 0, equipped: false, notes: '', catalog_entry_key: null, sort_order: details.inventory.length }
   const [newItem, setNewItem] = useState(empty)
   const [edits, setEdits] = useState<Record<string, Partial<DndCharacterInventoryInput>>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [catalog, setCatalog] = useState<DndRuleCatalogEntry[]>([])
+  const [catalogLoading, setCatalogLoading] = useState(true)
+
+  useEffect(() => {
+    getDndCatalogEntries(['item', 'armor', 'tool'])
+      .then(setCatalog)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Não foi possível carregar os itens.'))
+      .finally(() => setCatalogLoading(false))
+  }, [])
+
+  function selectInventoryEntry(entryKey: string) {
+    const entry = catalog.find((item) => item.entry_key === entryKey)
+    if (!entry) return
+    const properties = (entry.metadata.properties as string[] | undefined) ?? []
+    const cost = metadataText(entry, 'cost')
+    setNewItem((current) => ({
+      ...current,
+      catalog_entry_key: entry.entry_key,
+      name: entry.name,
+      weight: typeof entry.metadata.weight === 'number' ? entry.metadata.weight : current.weight,
+      notes: [cost, ...properties].filter(Boolean).join(' · '),
+    }))
+  }
 
   async function addItem() {
     if (!newItem.name.trim()) { setError('Informe o nome do item.'); return }
@@ -229,11 +292,16 @@ function InventoryEditor({ sheetId, details, onDetailsChange }: DetailsProps) {
       <p className="dnd-section-title">Inventário</p>
       <DetailMessage error={error} />
       <div className="dnd-detail-form dnd-detail-form--inventory">
+        <select className="dnd-edit-input" defaultValue="" onChange={(e) => selectInventoryEntry(e.target.value)}>
+          <option value="">Escolher item do catálogo</option>
+          {catalog.map((entry) => <option key={entry.entry_key} value={entry.entry_key}>{entry.name}</option>)}
+        </select>
         <input className="dnd-edit-input" placeholder="Nome do item" value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} />
         <input className="dnd-edit-input" type="number" min="1" placeholder="Qtd." value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: Number(e.target.value) })} />
         <input className="dnd-edit-input" type="number" min="0" step="0.1" placeholder="Peso" value={newItem.weight} onChange={(e) => setNewItem({ ...newItem, weight: Number(e.target.value) })} />
         <label className="dnd-detail-check"><input type="checkbox" checked={newItem.equipped} onChange={(e) => setNewItem({ ...newItem, equipped: e.target.checked })} /> Equipado</label>
         <button type="button" className="btn btn-primary" onClick={() => void addItem()} disabled={busy !== null}>Adicionar</button>
+        <CatalogStatus loading={catalogLoading} count={catalog.length} />
       </div>
       {details.inventory.length === 0 && <p className="dnd-detail-empty">Nenhum item cadastrado.</p>}
       <div className="dnd-detail-list">

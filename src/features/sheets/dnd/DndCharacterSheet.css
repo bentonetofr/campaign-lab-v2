@@ -1538,6 +1538,13 @@
   font-size: var(--text-sm);
 }
 
+.dnd-catalog-status {
+  align-self: center;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
 .dnd-skills-editor {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -16,6 +16,7 @@ import type {
   DndCharacterSpell,
   DndCharacterSpellInput,
   DndDerivedField,
+  DndRuleCatalogEntry,
   DndSheetDetails,
   ProfilePublic,
 } from '../../../../shared/types'
@@ -197,6 +198,22 @@ export async function removeDndOverride(sheetId: string, fieldKey: DndDerivedFie
     .eq('sheet_id', sheetId)
     .eq('field_key', fieldKey)
   if (error) throw new Error('Não foi possível restaurar o cálculo automático.')
+}
+
+/** Lista registros ativos do catálogo oficial para os editores da ficha. */
+export async function getDndCatalogEntries(
+  categories: DndRuleCatalogEntry['category'][]
+): Promise<DndRuleCatalogEntry[]> {
+  const { data, error } = await supabase
+    .from('dnd_rule_catalog_entries')
+    .select('*')
+    .eq('ruleset', 'dnd5e_2014')
+    .eq('is_active', true)
+    .in('category', categories)
+    .order('sort_order', { ascending: true })
+
+  if (error) throw new Error('Não foi possível carregar o catálogo D&D.')
+  return (data ?? []) as DndRuleCatalogEntry[]
 }
 
 /** Salva todas as proficiências exibidas na grade de perícias. */

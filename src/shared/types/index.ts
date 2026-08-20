@@ -308,6 +308,7 @@ export interface DndCharacterAttack {
   damage: string
   damage_type: string
   notes: string
+  catalog_entry_key: string | null
   sort_order: number
   created_at: string
   updated_at: string
@@ -326,6 +327,7 @@ export interface DndCharacterInventoryItem {
   weight: number
   equipped: boolean
   notes: string
+  catalog_entry_key: string | null
   sort_order: number
   created_at: string
   updated_at: string
