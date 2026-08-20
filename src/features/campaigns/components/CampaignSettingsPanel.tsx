@@ -2,6 +2,8 @@ import { FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   updateCampaignDetails,
+  uploadCampaignCover,
+  removeCampaignCover,
   deleteCampaign,
   leaveCampaign,
 } from '../services/campaignService'
@@ -19,6 +21,7 @@ interface CampaignSettingsPanelProps {
     name:        string
     description: string | null
     status:      CampaignWithRole['status']
+    cover_url:   string | null
   }) => void
 }
 
@@ -52,6 +55,10 @@ export function CampaignSettingsPanel({ campaign, onCampaignUpdate }: CampaignSe
   const [editSaving,  setEditSaving]  = useState(false)
   const [editError,   setEditError]   = useState<string | null>(null)
   const [editSuccess, setEditSuccess] = useState(false)
+
+  // ── Capa ──
+  const [coverBusy, setCoverBusy] = useState(false)
+  const [coverError, setCoverError] = useState<string | null>(null)
 
   // ── Exclusão ──
   const [deleting,     setDeleting]     = useState(false)
@@ -110,6 +117,7 @@ export function CampaignSettingsPanel({ campaign, onCampaignUpdate }: CampaignSe
         name:        trimmedName,
         description: editDesc.trim() || null,
         status:      editStatus,
+        cover_url:   campaign.cover_url,
       })
       setEditOpen(false)
       setEditSuccess(true)
@@ -118,6 +126,43 @@ export function CampaignSettingsPanel({ campaign, onCampaignUpdate }: CampaignSe
       setEditError(err instanceof Error ? err.message : 'Não foi possível atualizar a campanha.')
     } finally {
       setEditSaving(false)
+    }
+  }
+
+  async function handleCoverChange(file: File | undefined) {
+    if (!file) return
+    setCoverError(null)
+    setCoverBusy(true)
+    try {
+      const updated = await uploadCampaignCover(campaign.id, file)
+      onCampaignUpdate({
+        name: updated.name,
+        description: updated.description,
+        status: updated.status,
+        cover_url: updated.cover_url,
+      })
+    } catch (err) {
+      setCoverError(err instanceof Error ? err.message : 'Não foi possível atualizar a capa.')
+    } finally {
+      setCoverBusy(false)
+    }
+  }
+
+  async function handleCoverRemove() {
+    setCoverError(null)
+    setCoverBusy(true)
+    try {
+      const updated = await removeCampaignCover(campaign.id)
+      onCampaignUpdate({
+        name: updated.name,
+        description: updated.description,
+        status: updated.status,
+        cover_url: updated.cover_url,
+      })
+    } catch (err) {
+      setCoverError(err instanceof Error ? err.message : 'Não foi possível remover a capa.')
+    } finally {
+      setCoverBusy(false)
     }
   }
 
@@ -292,6 +337,62 @@ export function CampaignSettingsPanel({ campaign, onCampaignUpdate }: CampaignSe
                 </div>
               </form>
             )}
+          </div>
+        )}
+
+        {/* ── Capa da campanha (mestre) ── */}
+        {isMaster && (
+          <div className="settings-panel__section">
+            <span className="settings-panel__section-label">Identidade visual</span>
+
+            {campaign.cover_url ? (
+              <div
+                className="campaign-cover-preview"
+                style={{ backgroundImage: `url(${campaign.cover_url})` }}
+                role="img"
+                aria-label={`Capa da campanha ${campaign.name}`}
+              />
+            ) : (
+              <div className="campaign-cover-preview campaign-cover-preview--empty" aria-hidden="true">
+                <span>◈</span>
+              </div>
+            )}
+
+            <p className="settings-panel__hint">
+              JPG, PNG ou WebP. Tamanho máximo de 5 MB.
+            </p>
+
+            {coverError && (
+              <p className="settings-panel__msg settings-panel__msg--error" role="alert">
+                {coverError}
+              </p>
+            )}
+
+            <div className="settings-panel__cover-actions">
+              <label className="btn btn-ghost settings-panel__action">
+                {coverBusy ? 'Enviando...' : campaign.cover_url ? 'Trocar capa' : 'Enviar capa'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  hidden
+                  disabled={coverBusy}
+                  onChange={(e) => {
+                    void handleCoverChange(e.target.files?.[0])
+                    e.currentTarget.value = ''
+                  }}
+                />
+              </label>
+              {campaign.cover_url && (
+                <button
+                  type="button"
+                  className="btn btn-ghost settings-panel__action"
+                  onClick={() => void handleCoverRemove()}
+                  disabled={coverBusy}
+                >
+                  Remover
+                </button>
+              )}
+            </div>
           </div>
         )}
 

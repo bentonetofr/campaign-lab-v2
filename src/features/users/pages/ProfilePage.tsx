@@ -1,7 +1,14 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ensureProfile, updateCurrentProfile } from '../services/profileService'
+import {
+  ensureProfile,
+  removeCurrentAvatar,
+  updateCurrentPassword,
+  updateCurrentProfile,
+  uploadCurrentAvatar,
+} from '../services/profileService'
 import type { Profile } from '../../../shared/types'
+import { useTheme } from '../../../shared/theme/ThemeProvider'
 import '../../../features/campaigns/pages/CampaignPages.css'
 import './ProfilePage.css'
 
@@ -29,6 +36,16 @@ export function ProfilePage() {
   const [saving, setSaving]           = useState(false)
   const [saveError, setSaveError]     = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
+
+  const [avatarBusy, setAvatarBusy]   = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+
+  const [password, setPassword]             = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [passwordBusy, setPasswordBusy]     = useState(false)
+  const [passwordError, setPasswordError]   = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
+  const { theme } = useTheme()
 
   useEffect(() => {
     ensureProfile()
@@ -65,6 +82,55 @@ export function ProfilePage() {
       setSaveError(err instanceof Error ? err.message : 'Não foi possível atualizar o perfil.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleAvatarChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setAvatarError(null)
+    setAvatarBusy(true)
+    try {
+      setProfile(await uploadCurrentAvatar(file))
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : 'Não foi possível atualizar o avatar.')
+    } finally {
+      setAvatarBusy(false)
+    }
+  }
+
+  async function handleAvatarRemove() {
+    setAvatarError(null)
+    setAvatarBusy(true)
+    try {
+      setProfile(await removeCurrentAvatar())
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : 'Não foi possível remover o avatar.')
+    } finally {
+      setAvatarBusy(false)
+    }
+  }
+
+  async function handlePasswordSave(e: FormEvent) {
+    e.preventDefault()
+    setPasswordError(null)
+    setPasswordSuccess(false)
+    if (password !== passwordConfirm) {
+      setPasswordError('As senhas não coincidem.')
+      return
+    }
+    setPasswordBusy(true)
+    try {
+      await updateCurrentPassword(password)
+      setPassword('')
+      setPasswordConfirm('')
+      setPasswordSuccess(true)
+      setTimeout(() => setPasswordSuccess(false), 3500)
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Não foi possível atualizar a senha.')
+    } finally {
+      setPasswordBusy(false)
     }
   }
 
@@ -105,6 +171,48 @@ export function ProfilePage() {
       <div className="page__content animate-fade-up" style={{ animationDelay: '60ms' }}>
         <div className="profile-card">
           <div className="profile-card__top-line" aria-hidden="true" />
+
+          {/* ── Identidade visual ── */}
+          <h3 className="profile-card__title">Identidade visual</h3>
+
+          <div className="profile-avatar-editor">
+            <div className="profile-avatar" aria-hidden={profile.avatar_url ? undefined : true}>
+              {profile.avatar_url
+                ? <img src={profile.avatar_url} alt="" />
+                : profile.display_name.trim().charAt(0).toUpperCase()
+              }
+            </div>
+            <div className="profile-avatar-editor__body">
+              <strong>{profile.display_name}</strong>
+              <span>JPG, PNG ou WebP · máximo de 2 MB</span>
+              <div className="profile-avatar-editor__actions">
+                <label className="btn btn-ghost">
+                  {avatarBusy ? 'Enviando...' : 'Escolher avatar'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    hidden
+                    disabled={avatarBusy}
+                    onChange={handleAvatarChange}
+                  />
+                </label>
+                {profile.avatar_url && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => void handleAvatarRemove()}
+                    disabled={avatarBusy}
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {avatarError && (
+            <p className="profile-msg profile-msg--error" role="alert">{avatarError}</p>
+          )}
 
           {/* ── Campos somente leitura ── */}
           <h3 className="profile-card__title">Informações da conta</h3>
@@ -169,6 +277,62 @@ export function ProfilePage() {
               </button>
             </div>
           </form>
+
+          <hr className="profile-divider" />
+
+          {/* ── Segurança ── */}
+          <h3 className="profile-card__title">Segurança</h3>
+          <p className="profile-settings-hint">
+            Atualize sua senha sempre que quiser. Use pelo menos 8 caracteres.
+          </p>
+
+          {passwordSuccess && (
+            <p className="profile-msg profile-msg--success" role="status">Senha atualizada com sucesso.</p>
+          )}
+
+          <form onSubmit={handlePasswordSave} className="profile-form" noValidate>
+            <div className="auth-field">
+              <label className="label" htmlFor="profile-new-password">Nova senha</label>
+              <input
+                id="profile-new-password"
+                type="password"
+                className="input"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setPasswordError(null) }}
+                disabled={passwordBusy}
+                autoComplete="new-password"
+                minLength={8}
+              />
+            </div>
+            <div className="auth-field">
+              <label className="label" htmlFor="profile-new-password-confirm">Confirmar nova senha</label>
+              <input
+                id="profile-new-password-confirm"
+                type="password"
+                className="input"
+                value={passwordConfirm}
+                onChange={(e) => { setPasswordConfirm(e.target.value); setPasswordError(null) }}
+                disabled={passwordBusy}
+                autoComplete="new-password"
+                minLength={8}
+              />
+            </div>
+            {passwordError && <p className="profile-msg profile-msg--error" role="alert">{passwordError}</p>}
+            <div className="profile-form__actions">
+              <button type="submit" className="btn btn-primary" disabled={passwordBusy || !password || !passwordConfirm}>
+                {passwordBusy ? <><span className="spinner spinner--sm" /> Salvando...</> : 'Atualizar senha'}
+              </button>
+            </div>
+          </form>
+
+          <hr className="profile-divider" />
+
+          <div className="profile-preference">
+            <div>
+              <h3 className="profile-card__title">Preferência de aparência</h3>
+              <p className="profile-settings-hint">Tema atual: {theme === 'dark' ? 'Medieval escuro' : 'Pergaminho claro'}. Use o botão de tema na barra lateral para alternar.</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

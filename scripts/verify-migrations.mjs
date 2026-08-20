@@ -27,6 +27,7 @@ const expectedMigrations = [
   '20240122000000_remove_custom_campaign_system.sql',
   '20240123000000_dnd_character_sheets_base.sql',
   '20240125000000_dnd_abilities_saves.sql',
+  '20240126000000_profile_preferences_and_media.sql',
 ]
 
 const actualMigrations = readdirSync(migrationDirectory)

@@ -11,6 +11,7 @@ export interface Profile {
   email: string
   avatar_url: string | null
   main_provider: string | null
+  theme_preference: 'dark' | 'light'
   created_at: string
   updated_at: string
 }
@@ -29,6 +30,7 @@ export interface Campaign {
   system: CampaignSystem
   master_id: string
   description: string | null
+  cover_url: string | null
   status: 'active' | 'paused' | 'archived'
   created_at: string
   updated_at: string

@@ -1,6 +1,18 @@
 import { supabase } from '../../../shared/lib/supabase'
 import type { Profile } from '../../../shared/types'
 
+export const AVATAR_MAX_BYTES = 2 * 1024 * 1024
+export const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+
+function validateAvatar(file: File): void {
+  if (!AVATAR_TYPES.includes(file.type as (typeof AVATAR_TYPES)[number])) {
+    throw new Error('Escolha uma imagem JPG, PNG ou WebP.')
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    throw new Error('O avatar deve ter no máximo 2 MB.')
+  }
+}
+
 // ────────────────────────────────────────────────────────
 // Profile Service
 // ────────────────────────────────────────────────────────
@@ -37,15 +49,77 @@ export async function updateCurrentProfile(
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   if (userError || !user) throw new Error('Usuário não autenticado.')
 
+  const displayName = data.display_name.trim()
+  if (!displayName) throw new Error('O nome não pode ser vazio.')
+  if (displayName.length > 80) throw new Error('O nome deve ter no máximo 80 caracteres.')
+
   const { data: updated, error } = await supabase
     .from('profiles')
-    .update({ display_name: data.display_name.trim() })
+    .update({ display_name: displayName })
     .eq('id', user.id)
     .select('*')
     .single()
 
   if (error) throw new Error('Não foi possível atualizar o perfil.')
   return updated as Profile
+}
+
+/** Atualiza a senha da conta autenticada. */
+export async function updateCurrentPassword(password: string): Promise<void> {
+  if (password.length < 8) throw new Error('A nova senha deve ter pelo menos 8 caracteres.')
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) throw new Error('Não foi possível atualizar a senha.')
+}
+
+/** Faz upload do avatar no caminho protegido do próprio usuário. */
+export async function uploadCurrentAvatar(file: File): Promise<Profile> {
+  validateAvatar(file)
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) throw new Error('Usuário não autenticado.')
+
+  const path = `${user.id}/avatar`
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, {
+      upsert: true,
+      cacheControl: '3600',
+      contentType: file.type,
+    })
+
+  if (uploadError) throw new Error('Não foi possível enviar o avatar. Verifique se a migration de mídia foi aplicada.')
+
+  const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(path)
+  const avatarUrl = `${publicData.publicUrl}?v=${Date.now()}`
+
+  return updateProfileFields({ avatar_url: avatarUrl })
+}
+
+/** Remove o avatar armazenado e limpa a URL pública do perfil. */
+export async function removeCurrentAvatar(): Promise<Profile> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) throw new Error('Usuário não autenticado.')
+
+  const { error: removeError } = await supabase.storage
+    .from('avatars')
+    .remove([`${user.id}/avatar`])
+  if (removeError) throw new Error('Não foi possível remover o avatar.')
+
+  return updateProfileFields({ avatar_url: null })
+}
+
+async function updateProfileFields(fields: { avatar_url: string | null; theme_preference?: 'dark' | 'light' }): Promise<Profile> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) throw new Error('Usuário não autenticado.')
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(fields)
+    .eq('id', user.id)
+    .select('*')
+    .single()
+
+  if (error) throw new Error('Não foi possível atualizar o perfil.')
+  return data as Profile
 }
 
 /**

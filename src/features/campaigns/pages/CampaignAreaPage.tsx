@@ -104,6 +104,13 @@ export function CampaignAreaPage() {
     <div className="page campaign-area-page">
       {/* ── Cabeçalho ── */}
       <header className="page__header animate-fade-up">
+        <div
+          className={`campaign-area__cover${campaign.cover_url ? '' : ' campaign-area__cover--empty'}`}
+          style={campaign.cover_url ? { backgroundImage: `url(${campaign.cover_url})` } : undefined}
+          aria-hidden="true"
+        >
+          {!campaign.cover_url && '◈'}
+        </div>
         <div>
           <Link to="/campanhas" className="page__back">← Campanhas</Link>
           <h2 className="page__title">{campaign.name}</h2>

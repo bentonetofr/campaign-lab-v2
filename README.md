@@ -101,7 +101,7 @@ Authentication → URL Configuration
 
 As migrations devem ser aplicadas **em ordem**, uma por vez, no **Supabase Dashboard → SQL Editor → New query**.
 
-O repositório contém **23 migrations SQL**. A lista abaixo é o contrato canônico da
+O repositório contém **24 migrations SQL**. A lista abaixo é o contrato canônico da
 ordem de aplicação; não existe uma migration `20240121000000_my_sheets.sql` neste
 repositório e ela não deve ser criada ou aplicada sem uma decisão explícita de
 schema.
@@ -131,6 +131,7 @@ schema.
 | 21 | `20240122000000_remove_custom_campaign_system.sql` | Remove sistema `custom` das campanhas; recria RPC `create_campaign` com sistemas válidos: `generic`, `dnd5e`, `altherium` |
 | 22 | `20240123000000_dnd_character_sheets_base.sql` | Tabela `dnd_character_sheets` — ficha D&D 5e base; RLS; triggers de `updated_at` e campos estruturais imutáveis |
 | 23 | `20240125000000_dnd_abilities_saves.sql` | Idempotente: garante `player_name`, atributos (integer 1–30) e colunas `strength_save_proficient` etc. em `dnd_character_sheets` |
+| 24 | `20240126000000_profile_preferences_and_media.sql` | Preferência de tema, URL de capa da campanha, buckets `avatars`/`campaign-covers` e policies de Storage |
 
 > **Usuários criados antes da migration 1:** o trigger `handle_new_user` cria perfis apenas para novos cadastros. Para sincronizar usuários já existentes, rode o script de backfill comentado na seção 9 da migration 1.
 
@@ -158,7 +159,7 @@ Antes de abrir um deploy ou adicionar uma migration, execute:
 npm run verify
 ```
 
-O comando valida as 23 migrations registradas e depois executa o build de produção.
+O comando valida as 24 migrations registradas e depois executa o build de produção.
 
 ---
 
@@ -318,7 +319,7 @@ Toda inserção em `campaign_members` acontece via RPC (`add_campaign_player`, `
 
 ```
 supabase/
-└── migrations/             ← 23 migrations em ordem
+└── migrations/             ← 24 migrations em ordem
 
 src/
 ├── app/

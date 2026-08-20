@@ -4,6 +4,9 @@ import { logActivity, createCampaignActivity } from '../../activity/services/act
 import { isSupportedSystem } from '../../../shared/constants/systems'
 import type { Campaign, CampaignMember, CampaignWithRole, CampaignSystem } from '../../../shared/types'
 
+export const CAMPAIGN_COVER_MAX_BYTES = 5 * 1024 * 1024
+const CAMPAIGN_COVER_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+
 // ────────────────────────────────────────────────────────
 // Tipos de formulário
 // ────────────────────────────────────────────────────────
@@ -126,6 +129,59 @@ export async function updateCampaignDetails(
   return result as Campaign
 }
 
+/** Envia uma nova capa e atualiza a URL pública da campanha. */
+export async function uploadCampaignCover(campaignId: string, file: File): Promise<Campaign> {
+  if (!CAMPAIGN_COVER_TYPES.includes(file.type as (typeof CAMPAIGN_COVER_TYPES)[number])) {
+    throw new Error('Escolha uma imagem JPG, PNG ou WebP.')
+  }
+  if (file.size > CAMPAIGN_COVER_MAX_BYTES) {
+    throw new Error('A capa deve ter no máximo 5 MB.')
+  }
+
+  const path = `${campaignId}/cover`
+  const { error: uploadError } = await supabase.storage
+    .from('campaign-covers')
+    .upload(path, file, {
+      upsert: true,
+      cacheControl: '3600',
+      contentType: file.type,
+    })
+
+  if (uploadError) throw new Error('Não foi possível enviar a capa. Verifique se a migration de mídia foi aplicada.')
+
+  const { data: publicData } = supabase.storage.from('campaign-covers').getPublicUrl(path)
+  const coverUrl = `${publicData.publicUrl}?v=${Date.now()}`
+  const { data, error } = await supabase
+    .from('campaigns')
+    .update({ cover_url: coverUrl })
+    .eq('id', campaignId)
+    .select('*')
+    .single()
+
+  if (error) throw new Error('Não foi possível salvar a capa da campanha.')
+  logActivity(campaignId, 'campaign_updated', 'A capa da campanha foi atualizada.')
+  return data as Campaign
+}
+
+/** Remove a capa e deixa a campanha sem imagem personalizada. */
+export async function removeCampaignCover(campaignId: string): Promise<Campaign> {
+  const { error: removeError } = await supabase.storage
+    .from('campaign-covers')
+    .remove([`${campaignId}/cover`])
+  if (removeError) throw new Error('Não foi possível remover a capa da campanha.')
+
+  const { data, error } = await supabase
+    .from('campaigns')
+    .update({ cover_url: null })
+    .eq('id', campaignId)
+    .select('*')
+    .single()
+
+  if (error) throw new Error('Não foi possível salvar a remoção da capa.')
+  logActivity(campaignId, 'campaign_updated', 'A capa da campanha foi removida.')
+  return data as Campaign
+}
+
 /**
  * Atualiza o nome de uma campanha. Apenas o mestre pode chamar.
  * Retorna a campanha com o nome atualizado.
@@ -218,4 +274,3 @@ export async function getCampaignWithRole(
     role: row.role as CampaignMember['role'],
   }
 }
-

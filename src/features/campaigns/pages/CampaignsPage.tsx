@@ -108,6 +108,13 @@ function CampaignCard({ campaign }: { campaign: CampaignWithRole }) {
 
   return (
     <div className="campaign-card-row">
+      <div
+        className={`campaign-card-row__cover${campaign.cover_url ? '' : ' campaign-card-row__cover--empty'}`}
+        style={campaign.cover_url ? { backgroundImage: `url(${campaign.cover_url})` } : undefined}
+        aria-hidden="true"
+      >
+        {!campaign.cover_url && '◈'}
+      </div>
       <div className="campaign-card-row__info">
         <span className="campaign-card-row__name">{campaign.name}</span>
         <div className="campaign-card-row__meta">

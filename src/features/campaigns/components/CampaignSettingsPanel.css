@@ -55,6 +55,37 @@
   font-size: var(--text-xs);
 }
 
+.settings-panel__hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.settings-panel__cover-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.campaign-cover-preview {
+  width: min(100%, 560px);
+  aspect-ratio: 3 / 1;
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-md);
+  background-position: center;
+  background-size: cover;
+  background-color: var(--bg-elevated);
+}
+
+.campaign-cover-preview--empty {
+  display: grid;
+  place-items: center;
+  color: var(--accent-dim);
+  font-size: var(--text-3xl);
+  background-image: linear-gradient(135deg, var(--bg-elevated), var(--bg-surface));
+}
+
 /* Formulário de edição inline */
 .settings-panel__edit-form {
   display: flex;
