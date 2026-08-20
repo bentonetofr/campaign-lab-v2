@@ -1653,6 +1653,37 @@
 
 .dnd-detail-danger { color: #ffb4ab; }
 
+.dnd-derived-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.dnd-derived-mode {
+  padding: 1px 4px;
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+}
+
+.dnd-derived-mode:hover,
+.dnd-derived-mode--auto {
+  border-color: var(--gilded);
+  color: var(--accent-bright);
+}
+
+.dnd-stat-input:disabled,
+.dnd-num-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.78;
+}
+
 @media (max-width: 900px) {
   .dnd-skills-editor { grid-template-columns: 1fr; }
   .dnd-detail-form--attack,

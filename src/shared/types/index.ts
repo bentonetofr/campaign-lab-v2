@@ -252,6 +252,13 @@ export interface DndCharacterSheet {
   ideals:             string | null
   bonds:              string | null
   flaws:              string | null
+  // Regras selecionadas
+  ruleset:            'dnd5e_2014'
+  race_key:           string | null
+  subrace_key:        string | null
+  class_key:          string | null
+  subclass_key:       string | null
+  background_key:     string | null
   // Timestamps
   created_at: string
   updated_at: string
@@ -357,6 +364,50 @@ export interface DndSheetDetails {
   attacks: DndCharacterAttack[]
   inventory: DndCharacterInventoryItem[]
   spells: DndCharacterSpell[]
+  overrides: DndCharacterOverride[]
+}
+
+export type DndDerivedField =
+  | 'proficiency_bonus'
+  | 'initiative_bonus'
+  | 'armor_class'
+  | 'speed'
+  | 'hp_max'
+  | 'spell_save_dc'
+  | 'spell_attack_bonus'
+
+export interface DndCharacterOverride {
+  id: string
+  sheet_id: string
+  field_key: DndDerivedField
+  manual_value: string
+  reason: string
+  updated_at: string
+}
+
+export interface DndRuleCatalogEntry {
+  id: string
+  ruleset: 'dnd5e_2014'
+  category: 'race' | 'subrace' | 'class' | 'subclass' | 'background' | 'feat' | 'weapon' | 'armor' | 'item' | 'tool' | 'spell'
+  entry_key: string
+  name: string
+  description: string
+  level: number | null
+  school: string | null
+  ability: string | null
+  sort_order: number
+  metadata: Record<string, unknown>
+  is_active: boolean
+}
+
+export interface DndCharacterProficiency {
+  id: string
+  sheet_id: string
+  category: 'armor' | 'weapon' | 'tool' | 'language'
+  entry_key: string
+  label: string
+  source: string
+  created_at: string
 }
 
 /** Dados públicos de um convite — retornados sem autenticação pela RPC get_campaign_invite_public */

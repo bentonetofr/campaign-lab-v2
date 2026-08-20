@@ -7,6 +7,7 @@ import { logActivity } from '../../../activity/services/activityService'
 import type {
   DndCharacterAttack,
   DndCharacterAttackInput,
+  DndCharacterOverride,
   DndCharacterInventoryInput,
   DndCharacterInventoryItem,
   DndCharacterSkill,
@@ -14,6 +15,7 @@ import type {
   DndCharacterSheetUpdateInput,
   DndCharacterSpell,
   DndCharacterSpellInput,
+  DndDerivedField,
   DndSheetDetails,
   ProfilePublic,
 } from '../../../../shared/types'
@@ -148,14 +150,15 @@ export async function updateDndSheet(
 
 /** Carrega os blocos repetíveis da ficha D&D. */
 export async function getDndSheetDetails(sheetId: string): Promise<DndSheetDetails> {
-  const [skills, attacks, inventory, spells] = await Promise.all([
+  const [skills, attacks, inventory, spells, overrides] = await Promise.all([
     supabase.from('dnd_character_skills').select('*').eq('sheet_id', sheetId),
     supabase.from('dnd_character_attacks').select('*').eq('sheet_id', sheetId).order('sort_order', { ascending: true }),
     supabase.from('dnd_character_inventory').select('*').eq('sheet_id', sheetId).order('sort_order', { ascending: true }),
     supabase.from('dnd_character_spells').select('*').eq('sheet_id', sheetId).order('spell_level', { ascending: true }).order('sort_order', { ascending: true }),
+    supabase.from('dnd_character_overrides').select('*').eq('sheet_id', sheetId),
   ])
 
-  const firstError = [skills, attacks, inventory, spells].find((result) => result.error)?.error
+  const firstError = [skills, attacks, inventory, spells, overrides].find((result) => result.error)?.error
   if (firstError) {
     console.error('Erro ao carregar detalhes da ficha D&D:', firstError)
     throw new Error('Não foi possível carregar os detalhes da ficha D&D.')
@@ -166,7 +169,34 @@ export async function getDndSheetDetails(sheetId: string): Promise<DndSheetDetai
     attacks: (attacks.data ?? []) as DndCharacterAttack[],
     inventory: (inventory.data ?? []) as DndCharacterInventoryItem[],
     spells: (spells.data ?? []) as DndCharacterSpell[],
+    overrides: (overrides.data ?? []) as DndCharacterOverride[],
   }
+}
+
+/** Cria ou atualiza a exceção manual de um campo calculado. */
+export async function saveDndOverride(
+  sheetId: string,
+  fieldKey: DndDerivedField,
+  manualValue: string,
+  reason = '',
+): Promise<DndCharacterOverride> {
+  const { data, error } = await supabase
+    .from('dnd_character_overrides')
+    .upsert({ sheet_id: sheetId, field_key: fieldKey, manual_value: manualValue, reason }, { onConflict: 'sheet_id,field_key' })
+    .select('*')
+    .single()
+  if (error) throw new Error('Não foi possível salvar o modo manual.')
+  return data as DndCharacterOverride
+}
+
+/** Remove a exceção e devolve o campo ao cálculo do livro. */
+export async function removeDndOverride(sheetId: string, fieldKey: DndDerivedField): Promise<void> {
+  const { error } = await supabase
+    .from('dnd_character_overrides')
+    .delete()
+    .eq('sheet_id', sheetId)
+    .eq('field_key', fieldKey)
+  if (error) throw new Error('Não foi possível restaurar o cálculo automático.')
 }
 
 /** Salva todas as proficiências exibidas na grade de perícias. */

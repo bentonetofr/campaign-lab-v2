@@ -3,15 +3,19 @@
 // ────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ensureMyDndSheet, getDndSheetDetails, updateDndSheet } from './services/dndSheetService'
+import { ensureMyDndSheet, getDndSheetDetails, removeDndOverride, saveDndOverride, updateDndSheet } from './services/dndSheetService'
 import { rollDice } from '../../dice/services/diceService'
 import {
   getAbilityModifier,
   formatModifier,
   getSavingThrowBonus,
   buildRollFormula,
+  getInitiativeBonus,
+  getProficiencyBonus,
+  getSpellAttackBonus,
+  getSpellSaveDc,
 } from './utils/dndCalculations'
-import type { DndCharacterSheet, DndCharacterSheetUpdateInput, DndSheetDetails } from '../../../shared/types'
+import type { DndCharacterSheet, DndCharacterSheetUpdateInput, DndDerivedField, DndSheetDetails } from '../../../shared/types'
 import { DndAttacksEditor, DndInventoryEditor, DndSkillsEditor, DndSpellsEditor } from './DndDetailsEditors'
 import './DndCharacterSheet.css'
 
@@ -125,6 +129,58 @@ function sheetToDraft(s: DndCharacterSheet): DndDraft {
     bonds:                        s.bonds                        ?? '',
     flaws:                        s.flaws                        ?? '',
   }
+}
+
+const AUTO_FIELDS: DndDerivedField[] = [
+  'proficiency_bonus',
+  'initiative_bonus',
+  'spell_save_dc',
+  'spell_attack_bonus',
+]
+
+function DerivedModeButton({ field, automatic, onToggle }: { field: DndDerivedField; automatic: boolean; onToggle: (field: DndDerivedField) => void }) {
+  return (
+    <button
+      type="button"
+      className={`dnd-derived-mode${automatic ? ' dnd-derived-mode--auto' : ''}`}
+      onClick={() => onToggle(field)}
+      title={automatic ? 'Usando cálculo do Livro do Jogador. Clique para editar manualmente.' : 'Valor manual. Clique para restaurar o cálculo automático.'}
+    >
+      {automatic ? 'AUTO' : 'MANUAL'}
+    </button>
+  )
+}
+
+function spellcastingScore(draft: DndDraft): number | null {
+  const key = draft.spellcasting_ability.trim().toLowerCase()
+  const scores: Record<string, string> = {
+    for: 'strength', str: 'strength', força: 'strength',
+    des: 'dexterity', dex: 'dexterity', destreza: 'dexterity',
+    con: 'constitution', constituição: 'constitution',
+    int: 'intelligence', inteligência: 'intelligence',
+    sab: 'wisdom', wis: 'wisdom', sabedoria: 'wisdom',
+    car: 'charisma', cha: 'charisma', carisma: 'charisma',
+  }
+  const field = scores[key]
+  return field ? Number(draft[field as keyof DndDraft]) : null
+}
+
+function applyAutomaticValues(draft: DndDraft, overrides: DndSheetDetails['overrides']): DndDraft {
+  const next = { ...draft }
+  const manual = new Set(overrides.map((override) => override.field_key))
+  const level = Number(draft.level) || 1
+  const proficiency = getProficiencyBonus(level)
+
+  if (!manual.has('proficiency_bonus')) next.proficiency_bonus = String(proficiency)
+  if (!manual.has('initiative_bonus')) next.initiative_bonus = String(getInitiativeBonus(Number(draft.dexterity) || 10))
+  if (!manual.has('spell_save_dc') || !manual.has('spell_attack_bonus')) {
+    const score = spellcastingScore(draft)
+    if (score != null) {
+      if (!manual.has('spell_save_dc')) next.spell_save_dc = String(getSpellSaveDc(proficiency, score))
+      if (!manual.has('spell_attack_bonus')) next.spell_attack_bonus = String(getSpellAttackBonus(proficiency, score))
+    }
+  }
+  return next
 }
 
 // ────────────────────────────────────────────────────────
@@ -399,9 +455,11 @@ interface QuickStatsProps {
   draft:    DndDraft
   errors:   FieldErrors
   onChange: (p: Partial<DndDraft>) => void
+  automaticFields: Set<DndDerivedField>
+  onToggleAutomatic: (field: DndDerivedField) => void
 }
 
-function DndQuickStatsColumn({ draft, errors, onChange }: QuickStatsProps) {
+function DndQuickStatsColumn({ draft, errors, onChange, automaticFields, onToggleAutomatic }: QuickStatsProps) {
   const hpCur  = numVal(draft.hp_current)
   const hpMax  = numVal(draft.hp_max)
   const hpPct  = hpMax > 0 ? (hpCur / hpMax) * 100 : 0
@@ -472,12 +530,16 @@ function DndQuickStatsColumn({ draft, errors, onChange }: QuickStatsProps) {
 
       {/* Iniciativa */}
       <div className="dnd-stat-card">
-        <p className="dnd-stat-card__label">Iniciativa</p>
+        <p className="dnd-stat-card__label dnd-derived-label">
+          <span>Iniciativa</span>
+          <DerivedModeButton field="initiative_bonus" automatic={automaticFields.has('initiative_bonus')} onToggle={onToggleAutomatic} />
+        </p>
         <input
           type="number"
           value={draft.initiative_bonus}
           onChange={(e) => onChange({ initiative_bonus: e.target.value })}
           className="dnd-stat-input"
+          disabled={automaticFields.has('initiative_bonus')}
           title="Bônus de iniciativa"
         />
         <p className="dnd-stat-card__sub">{initStr}</p>
@@ -498,12 +560,16 @@ function DndQuickStatsColumn({ draft, errors, onChange }: QuickStatsProps) {
 
       {/* Proficiência */}
       <div className="dnd-stat-card">
-        <p className="dnd-stat-card__label">Proficiência</p>
+        <p className="dnd-stat-card__label dnd-derived-label">
+          <span>Proficiência</span>
+          <DerivedModeButton field="proficiency_bonus" automatic={automaticFields.has('proficiency_bonus')} onToggle={onToggleAutomatic} />
+        </p>
         <input
           type="number"
           value={draft.proficiency_bonus}
           onChange={(e) => onChange({ proficiency_bonus: e.target.value })}
           className="dnd-stat-input"
+          disabled={automaticFields.has('proficiency_bonus')}
           title="Bônus de proficiência"
         />
         {errors.proficiency_bonus && <p style={{ fontSize: 9, color: '#e06060' }}>{errors.proficiency_bonus}</p>}
@@ -571,6 +637,8 @@ interface AbilitiesProps {
   campaignId: string
   rolling:    string | null
   onRolling:  (key: string | null) => void
+  automaticFields: Set<DndDerivedField>
+  onToggleAutomatic: (field: DndDerivedField) => void
 }
 
 const ABILITY_KEYS = [
@@ -582,7 +650,7 @@ const ABILITY_KEYS = [
   { key: 'charisma',     label: 'CAR', name: 'Carisma',      saveKey: 'charisma_save_proficient'     },
 ] as const
 
-function DndAbilitiesColumn({ draft, errors, onChange, campaignId, rolling, onRolling }: AbilitiesProps) {
+function DndAbilitiesColumn({ draft, errors, onChange, campaignId, rolling, onRolling, automaticFields, onToggleAutomatic }: AbilitiesProps) {
   const pb = numVal(draft.proficiency_bonus)
 
   const handleRollAbility = async (abilityName: string, score: number) => {
@@ -695,24 +763,32 @@ function DndAbilitiesColumn({ draft, errors, onChange, campaignId, rolling, onRo
             />
           </div>
           <div className="dnd-save-row">
-            <span className="dnd-save-row__name">CD de magia</span>
+            <span className="dnd-save-row__name dnd-derived-label">
+              <span>CD de magia</span>
+              <DerivedModeButton field="spell_save_dc" automatic={automaticFields.has('spell_save_dc')} onToggle={onToggleAutomatic} />
+            </span>
             <input
               type="number"
               value={draft.spell_save_dc}
               onChange={(e) => onChange({ spell_save_dc: e.target.value })}
               className="dnd-num-input"
               style={{ marginLeft: 'auto' }}
+              disabled={automaticFields.has('spell_save_dc')}
               placeholder="—"
             />
           </div>
           <div className="dnd-save-row">
-            <span className="dnd-save-row__name">Bônus ataque mágico</span>
+            <span className="dnd-save-row__name dnd-derived-label">
+              <span>Bônus ataque mágico</span>
+              <DerivedModeButton field="spell_attack_bonus" automatic={automaticFields.has('spell_attack_bonus')} onToggle={onToggleAutomatic} />
+            </span>
             <input
               type="number"
               value={draft.spell_attack_bonus}
               onChange={(e) => onChange({ spell_attack_bonus: e.target.value })}
               className="dnd-num-input"
               style={{ marginLeft: 'auto' }}
+              disabled={automaticFields.has('spell_attack_bonus')}
               placeholder="—"
             />
           </div>
@@ -893,7 +969,7 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
   const [fieldErrors,setFieldErrors]= useState<FieldErrors>({})
   const [activeTab,  setActiveTab]  = useState<TabId>('resumo')
   const [rolling,    setRolling]    = useState<string | null>(null)
-  const [details,    setDetails]    = useState<DndSheetDetails>({ skills: [], attacks: [], inventory: [], spells: [] })
+  const [details,    setDetails]    = useState<DndSheetDetails>({ skills: [], attacks: [], inventory: [], spells: [], overrides: [] })
 
   // Auto-hide success banner
   const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -942,7 +1018,8 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
   // ── Salvar ──
   const handleSave = useCallback(async () => {
     if (!draft || !sheet) return
-    const errs = validateDraft(draft)
+    const effectiveDraft = applyAutomaticValues(draft, details.overrides)
+    const errs = validateDraft(effectiveDraft)
     if (Object.keys(errs).length) {
       setFieldErrors(errs)
       return
@@ -952,9 +1029,9 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
     try {
       const updated = await updateDndSheet(
         sheet.id,
-        draftToUpdate(draft),
+        draftToUpdate(effectiveDraft),
         campaignId,
-        draft.character_name
+        effectiveDraft.character_name
       )
       setSheet(updated)
       setDraft(sheetToDraft(updated))
@@ -970,7 +1047,7 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
     } finally {
       setSaving(false)
     }
-  }, [draft, sheet, campaignId])
+  }, [draft, sheet, details.overrides, campaignId])
 
   // ── Loading / error ──
   if (loading) {
@@ -994,6 +1071,30 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
 
   if (!draft || !sheet) return null
 
+  const currentSheetId = sheet.id
+  const automaticFields = new Set(
+    AUTO_FIELDS.filter((field) => !details.overrides.some((override) => override.field_key === field)),
+  )
+  const effectiveDraft = applyAutomaticValues(draft, details.overrides)
+
+  async function handleToggleAutomatic(field: DndDerivedField) {
+    const existing = details.overrides.find((override) => override.field_key === field)
+    try {
+      if (existing) {
+        await removeDndOverride(currentSheetId, field)
+        setDetails((current) => ({ ...current, overrides: current.overrides.filter((override) => override.field_key !== field) }))
+      } else {
+        const value = effectiveDraft[field as keyof DndDraft]
+        const saved = await saveDndOverride(currentSheetId, field, String(value ?? ''))
+        setDetails((current) => ({ ...current, overrides: [...current.overrides, saved] }))
+      }
+      setSaveError(null)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Não foi possível alternar o modo do campo.')
+      setSaveStatus('error')
+    }
+  }
+
   return (
     <div className="dnd-sheet">
       {/* ── Banners ── */}
@@ -1013,7 +1114,7 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
 
       {/* ── Cabeçalho ── */}
       <DndEditableHeader
-        draft={draft}
+        draft={effectiveDraft}
         errors={fieldErrors}
         onChange={handleChange}
       />
@@ -1022,19 +1123,23 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
       <div className="dnd-body">
         {/* Coluna esquerda */}
         <DndQuickStatsColumn
-          draft={draft}
+          draft={effectiveDraft}
           errors={fieldErrors}
           onChange={handleChange}
+          automaticFields={automaticFields}
+          onToggleAutomatic={handleToggleAutomatic}
         />
 
         {/* Coluna central */}
         <DndAbilitiesColumn
-          draft={draft}
+          draft={effectiveDraft}
           errors={fieldErrors}
           onChange={handleChange}
           campaignId={campaignId}
           rolling={rolling}
           onRolling={setRolling}
+          automaticFields={automaticFields}
+          onToggleAutomatic={handleToggleAutomatic}
         />
 
         {/* Coluna direita — abas */}
@@ -1052,13 +1157,13 @@ export function DndCharacterSheetPanel({ campaignId }: DndCharacterSheetPanelPro
             ))}
           </nav>
 
-          {activeTab === 'resumo'     && <TabResumo    draft={draft} />}
-          {activeTab === 'combate'    && <TabCombate sheetId={sheet.id} draft={draft} details={details} onDetailsChange={setDetails} />}
-          {activeTab === 'pericias'   && <DndSkillsEditor sheetId={sheet.id} details={details} onDetailsChange={setDetails} draft={draft as unknown as Record<string, string>} />}
+          {activeTab === 'resumo'     && <TabResumo    draft={effectiveDraft} />}
+          {activeTab === 'combate'    && <TabCombate sheetId={sheet.id} draft={effectiveDraft} details={details} onDetailsChange={setDetails} />}
+          {activeTab === 'pericias'   && <DndSkillsEditor sheetId={sheet.id} details={details} onDetailsChange={setDetails} draft={effectiveDraft as unknown as Record<string, string>} />}
           {activeTab === 'magias'     && <DndSpellsEditor sheetId={sheet.id} details={details} onDetailsChange={setDetails} />}
           {activeTab === 'inventario' && <DndInventoryEditor sheetId={sheet.id} details={details} onDetailsChange={setDetails} />}
-          {activeTab === 'tracos'     && <TabTracos    draft={draft} onChange={handleChange} />}
-          {activeTab === 'anotacoes'  && <TabAnotacoes draft={draft} onChange={handleChange} />}
+          {activeTab === 'tracos'     && <TabTracos    draft={effectiveDraft} onChange={handleChange} />}
+          {activeTab === 'anotacoes'  && <TabAnotacoes draft={effectiveDraft} onChange={handleChange} />}
         </div>
       </div>
     </div>

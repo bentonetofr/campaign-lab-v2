@@ -42,7 +42,7 @@ O schema atual contém:
 - `dice_rolls`, `campaign_activity` e `campaign_presence`;
 - buckets públicos `avatars` e `campaign-covers`, com escrita protegida por RLS.
 
-O contrato canônico contém 25 migrations SQL. A verificação local é executada com:
+O contrato canônico contém 26 migrations SQL. A verificação local é executada com:
 
 ```bash
 npm run verify
