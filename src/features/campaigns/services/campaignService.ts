@@ -5,7 +5,7 @@ import { isSupportedSystem } from '../../../shared/constants/systems'
 import type { Campaign, CampaignMember, CampaignWithRole, CampaignSystem } from '../../../shared/types'
 
 export const CAMPAIGN_COVER_MAX_BYTES = 5 * 1024 * 1024
-const CAMPAIGN_COVER_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+export const CAMPAIGN_COVER_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 
 // ────────────────────────────────────────────────────────
 // Tipos de formulário

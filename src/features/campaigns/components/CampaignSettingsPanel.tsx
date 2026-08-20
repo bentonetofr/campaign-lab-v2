@@ -1,12 +1,15 @@
 import { FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  CAMPAIGN_COVER_MAX_BYTES,
+  CAMPAIGN_COVER_TYPES,
   updateCampaignDetails,
   uploadCampaignCover,
   removeCampaignCover,
   deleteCampaign,
   leaveCampaign,
 } from '../services/campaignService'
+import { CampaignCoverCropEditor } from './CampaignCoverCropEditor'
 import { getSystemLabel, getSystemStatus, STATUS_LABELS } from '../../../shared/constants/systems'
 import type { CampaignWithRole } from '../../../shared/types'
 import './CampaignSettingsPanel.css'
@@ -59,6 +62,7 @@ export function CampaignSettingsPanel({ campaign, onCampaignUpdate }: CampaignSe
   // ── Capa ──
   const [coverBusy, setCoverBusy] = useState(false)
   const [coverError, setCoverError] = useState<string | null>(null)
+  const [coverDraft, setCoverDraft] = useState<File | null>(null)
 
   // ── Exclusão ──
   const [deleting,     setDeleting]     = useState(false)
@@ -132,6 +136,21 @@ export function CampaignSettingsPanel({ campaign, onCampaignUpdate }: CampaignSe
   async function handleCoverChange(file: File | undefined) {
     if (!file) return
     setCoverError(null)
+
+    if (!CAMPAIGN_COVER_TYPES.includes(file.type as (typeof CAMPAIGN_COVER_TYPES)[number])) {
+      setCoverError('Escolha uma imagem JPG, PNG ou WebP.')
+      return
+    }
+    if (file.size > CAMPAIGN_COVER_MAX_BYTES) {
+      setCoverError('A capa deve ter no máximo 5 MB.')
+      return
+    }
+
+    setCoverDraft(file)
+  }
+
+  async function handleCoverSave(file: File) {
+    setCoverError(null)
     setCoverBusy(true)
     try {
       const updated = await uploadCampaignCover(campaign.id, file)
@@ -141,6 +160,7 @@ export function CampaignSettingsPanel({ campaign, onCampaignUpdate }: CampaignSe
         status: updated.status,
         cover_url: updated.cover_url,
       })
+      setCoverDraft(null)
     } catch (err) {
       setCoverError(err instanceof Error ? err.message : 'Não foi possível atualizar a capa.')
     } finally {
@@ -376,8 +396,8 @@ export function CampaignSettingsPanel({ campaign, onCampaignUpdate }: CampaignSe
                   accept="image/jpeg,image/png,image/webp"
                   hidden
                   disabled={coverBusy}
-                  onChange={(e) => {
-                    void handleCoverChange(e.target.files?.[0])
+                onChange={(e) => {
+                  void handleCoverChange(e.target.files?.[0])
                     e.currentTarget.value = ''
                   }}
                 />
@@ -393,6 +413,15 @@ export function CampaignSettingsPanel({ campaign, onCampaignUpdate }: CampaignSe
                 </button>
               )}
             </div>
+
+            {coverDraft && (
+              <CampaignCoverCropEditor
+                file={coverDraft}
+                saving={coverBusy}
+                onCancel={() => setCoverDraft(null)}
+                onSave={handleCoverSave}
+              />
+            )}
           </div>
         )}
 
