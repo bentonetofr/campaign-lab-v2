@@ -1,0 +1,52 @@
+.dnd-coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: 420px;
+  padding: var(--space-8);
+  border: 1px solid var(--gilded);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(circle at top, rgba(202, 151, 63, 0.12), transparent 52%),
+    var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+.dnd-coming-soon--compact {
+  min-height: 0;
+  margin-top: var(--space-3);
+  padding: var(--space-5);
+}
+
+.dnd-coming-soon__image {
+  display: block;
+  width: min(100%, 340px);
+  aspect-ratio: 1 / 1;
+  border: 3px solid var(--accent-bright);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.42);
+  object-fit: cover;
+}
+
+.dnd-coming-soon--compact .dnd-coming-soon__image {
+  width: min(100%, 230px);
+}
+
+.dnd-coming-soon__message {
+  margin: 0;
+  color: var(--accent-bright);
+  font-family: var(--font-display);
+  font-size: clamp(var(--text-xl), 4vw, var(--text-3xl));
+  line-height: 1.1;
+}
+
+@media (max-width: 640px) {
+  .dnd-coming-soon {
+    min-height: 0;
+    padding: var(--space-5);
+  }
+}

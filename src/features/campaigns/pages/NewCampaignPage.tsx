@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { createCampaign } from '../services/campaignService'
 import { SYSTEMS_CATALOG, STATUS_LABELS, isSupportedSystem } from '../../../shared/constants/systems'
 import type { CampaignSystem } from '../../../shared/types'
+import { DndComingSoon } from '../../sheets/dnd/DndComingSoon'
 import './CampaignPages.css'
 
 const NAME_MAX        = 120
@@ -16,6 +17,7 @@ export function NewCampaignPage() {
   const [system,      setSystem]      = useState<CampaignSystem>('generic')
   const [error,       setError]       = useState<string | null>(null)
   const [submitting,  setSubmitting]  = useState(false)
+  const [showDndNotice, setShowDndNotice] = useState(false)
 
   const nameOver = name.length > NAME_MAX
   const descOver = description.length > DESCRIPTION_MAX
@@ -29,6 +31,7 @@ export function NewCampaignPage() {
     if (nameOver)     { setError(`O nome deve ter no máximo ${NAME_MAX} caracteres.`); return }
     if (descOver)     { setError(`A descrição deve ter no máximo ${DESCRIPTION_MAX} caracteres.`); return }
     if (!isSupportedSystem(system)) { setError('Selecione um sistema válido.'); return }
+    if (system === 'dnd5e') { setShowDndNotice(true); return }
 
     setSubmitting(true)
     try {
@@ -122,7 +125,17 @@ export function NewCampaignPage() {
                       role="radio"
                       aria-checked={isSelected}
                       className={`system-option${isSelected ? ' system-option--selected' : ''}`}
-                      onClick={() => { setSystem(sys.id); setError(null) }}
+                      onClick={() => {
+                        if (sys.id === 'dnd5e') {
+                          setSystem(sys.id)
+                          setShowDndNotice(true)
+                          setError(null)
+                          return
+                        }
+                        setSystem(sys.id)
+                        setShowDndNotice(false)
+                        setError(null)
+                      }}
                       disabled={submitting}
                     >
                       <div className="system-option__radio">
@@ -144,6 +157,9 @@ export function NewCampaignPage() {
                   )
                 })}
               </div>
+              {showDndNotice && (
+                <DndComingSoon compact onClose={() => setShowDndNotice(false)} />
+              )}
             </div>
 
             {/* Descrição */}
@@ -175,7 +191,7 @@ export function NewCampaignPage() {
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={submitting || nameOver || descOver}
+                disabled={submitting || nameOver || descOver || system === 'dnd5e'}
               >
                 {submitting
                   ? <><span className="spinner spinner--sm" /> Criando...</>

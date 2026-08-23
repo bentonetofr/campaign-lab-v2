@@ -29,8 +29,8 @@ export const SYSTEMS_CATALOG: SystemEntry[] = [
   {
     id:          'dnd5e',
     label:       'D&D 5e',
-    description: 'Sistema de fantasia baseado em atributos, perícias, combate, magias e rolagens com d20.',
-    status:      'preview',
+    description: 'Sistema de fantasia em desenvolvimento. A ficha completa será disponibilizada futuramente.',
+    status:      'coming-soon',
     icon:        '⚔',
   },
   {

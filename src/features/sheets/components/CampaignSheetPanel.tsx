@@ -1,5 +1,5 @@
 import { SimpleSheetPanel }           from './SimpleSheetPanel'
-import { DndCharacterSheetPanel }    from '../dnd/DndCharacterSheetPanel'
+import { DndComingSoon }             from '../dnd/DndComingSoon'
 import { AltheriumSheetComingSoon }  from '../altherium/components/AltheriumSheetComingSoon'
 import type { CampaignWithRole }     from '../../../shared/types'
 
@@ -16,15 +16,10 @@ interface CampaignSheetPanelProps {
 // Roteador de fichas por sistema
 // ────────────────────────────────────────────────────────
 
-export function CampaignSheetPanel({ campaign, currentUserId }: CampaignSheetPanelProps) {
+export function CampaignSheetPanel({ campaign }: CampaignSheetPanelProps) {
   switch (campaign.system) {
     case 'dnd5e':
-      return (
-        <DndCharacterSheetPanel
-          campaignId={campaign.id}
-          currentUserId={currentUserId}
-        />
-      )
+      return <DndComingSoon />
 
     case 'altherium':
       return <AltheriumSheetComingSoon />
