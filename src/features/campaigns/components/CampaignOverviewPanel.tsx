@@ -6,6 +6,7 @@ import {
   type OverviewPlayerData,
 } from '../services/campaignOverviewService'
 import { isSheetFilled } from '../../sheets/services/sheetService'
+import { useDiceRoller } from '../../dice/DiceRollerProvider'
 import type { CampaignWithRole } from '../../../shared/types'
 import type { TabId } from '../pages/CampaignAreaPage'
 import './CampaignOverviewPanel.css'
@@ -123,10 +124,11 @@ function OverviewNotesCard({ notesTotal, latestNote, onNavigate }: OverviewNotes
 interface RecentRollsCardProps {
   rolls:         OverviewMasterData['recentRolls']
   currentUserId: string
-  onNavigate:    (tab: TabId) => void
 }
 
-function RecentRollsCard({ rolls, currentUserId, onNavigate }: RecentRollsCardProps) {
+function RecentRollsCard({ rolls, currentUserId }: RecentRollsCardProps) {
+  const { open: openDiceRoller } = useDiceRoller()
+
   return (
     <div className="ov-rolls-card">
       <div className="ov-rolls-card__header">
@@ -134,7 +136,7 @@ function RecentRollsCard({ rolls, currentUserId, onNavigate }: RecentRollsCardPr
         <span className="ov-rolls-card__title">Rolagens recentes</span>
         <button
           className="btn btn-ghost ov-rolls-card__link"
-          onClick={() => onNavigate('rolagem')}
+          onClick={openDiceRoller}
         >
           Rolar dados →
         </button>
@@ -326,7 +328,6 @@ function MasterDashboard({
       <RecentRollsCard
         rolls={data.recentRolls}
         currentUserId={currentUserId}
-        onNavigate={onNavigate}
       />
 
     </div>
@@ -453,7 +454,6 @@ function PlayerDashboard({
       <RecentRollsCard
         rolls={data.recentRolls}
         currentUserId={currentUserId}
-        onNavigate={onNavigate}
       />
 
     </div>

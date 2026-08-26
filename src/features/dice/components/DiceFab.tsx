@@ -1,0 +1,191 @@
+import { useEffect, useRef, useState } from 'react'
+import { useAuth } from '../../auth/AuthProvider'
+import { useDiceRoller } from '../DiceRollerProvider'
+import { DiceRollerPanel } from './DiceRollerPanel'
+import type { DiceRoll, RollBreakdownItem } from '../../../shared/types'
+import './DiceFab.css'
+
+// Duração do "giro" antes de assentar no resultado final.
+const ROLL_ANIMATION_MS = 500
+// Quanto tempo a notificação de resultado fica visível antes de sumir sozinha.
+const TOAST_DURATION_MS = 4000
+
+function signStr(n: number): string {
+  return n > 0 ? `+${n}` : `${n}`
+}
+
+function totalClass(roll: DiceRoll): string {
+  const breakdown = roll.roll_breakdown
+  if (!breakdown) return 'dice-toast__total'
+  // crit: apenas 1 termo de dado com qty=1, sem modifier, resultado = sides
+  const diceTerms = breakdown.filter((b) => b.type !== 'modifier')
+  if (diceTerms.length === 1) {
+    const t = diceTerms[0]
+    if ('sides' in t) {
+      const noMod = !breakdown.some((b) => b.type === 'modifier')
+      if (t.quantity === 1 && t.results[0] === t.sides && noMod) {
+        return 'dice-toast__total dice-toast__total--max'
+      }
+      if (t.quantity === 1 && t.results[0] === 1 && noMod) {
+        return 'dice-toast__total dice-toast__total--min'
+      }
+    }
+  }
+  return 'dice-toast__total'
+}
+
+function ToastBreakdown({ breakdown }: { breakdown: RollBreakdownItem[] }) {
+  const diceTerms = breakdown.filter((b) => b.type !== 'modifier')
+  const modTerm   = breakdown.find(
+    (b): b is Extract<RollBreakdownItem, { type: 'modifier' }> => b.type === 'modifier'
+  )
+
+  return (
+    <dl className="dice-breakdown">
+      {diceTerms.map((item, idx) => {
+        if (item.type === 'sum') {
+          return (
+            <div key={idx} className="dice-breakdown__row">
+              <dt className="dice-breakdown__label">{item.notation}</dt>
+              <dd className="dice-breakdown__value">
+                {item.results.join(', ')}
+                {item.quantity > 1 && (
+                  <span className="dice-breakdown__sub"> = {item.subtotal}</span>
+                )}
+              </dd>
+            </div>
+          )
+        }
+        if (item.type === 'keep_highest' || item.type === 'keep_lowest') {
+          const label = item.type === 'keep_highest' ? 'maior' : 'menor'
+          return (
+            <div key={idx} className="dice-breakdown__row">
+              <dt className="dice-breakdown__label">{item.notation}</dt>
+              <dd className="dice-breakdown__value">
+                {item.results.join(', ')}
+                <span className="dice-breakdown__sub"> → {label}: {item.kept}</span>
+              </dd>
+            </div>
+          )
+        }
+        return null
+      })}
+      {modTerm && (
+        <div className="dice-breakdown__row">
+          <dt className="dice-breakdown__label">Modificador</dt>
+          <dd className="dice-breakdown__value">{signStr(modTerm.value)}</dd>
+        </div>
+      )}
+    </dl>
+  )
+}
+
+export function DiceFab() {
+  const { user } = useAuth()
+  const { campaignId, isOpen, open, close } = useDiceRoller()
+
+  // ── Notificação de resultado ──
+  const [activeRoll, setActiveRoll]   = useState<DiceRoll | null>(null)
+  const [displayRoll, setDisplayRoll] = useState<number | null>(null)
+  const [toastKey, setToastKey]       = useState(0)
+  const cycleRef   = useRef<number | null>(null)
+  const dismissRef = useRef<number | null>(null)
+
+  useEffect(() => () => {
+    if (cycleRef.current !== null)   window.clearInterval(cycleRef.current)
+    if (dismissRef.current !== null) window.clearTimeout(dismissRef.current)
+  }, [])
+
+  function handleRoll(roll: DiceRoll) {
+    if (cycleRef.current !== null)   window.clearInterval(cycleRef.current)
+    if (dismissRef.current !== null) window.clearTimeout(dismissRef.current)
+
+    cycleRef.current = window.setInterval(() => {
+      setDisplayRoll(1 + Math.floor(Math.random() * 20))
+    }, 60)
+
+    window.setTimeout(() => {
+      if (cycleRef.current !== null) window.clearInterval(cycleRef.current)
+      cycleRef.current = null
+      setDisplayRoll(null)
+      setActiveRoll(roll)
+      setToastKey((k) => k + 1)
+
+      dismissRef.current = window.setTimeout(() => {
+        setActiveRoll(null)
+        dismissRef.current = null
+      }, TOAST_DURATION_MS)
+    }, ROLL_ANIMATION_MS)
+  }
+
+  if (!user) return null
+
+  if (!campaignId) {
+    return (
+      <div className="dice-fab-wrapper">
+        <button
+          type="button"
+          className="dice-fab dice-fab--locked"
+          disabled
+          aria-label="Rolagem de dados indisponível fora de uma campanha"
+          title="Entre em uma campanha para rolar dados"
+        >
+          <span aria-hidden="true">🔒</span>
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="dice-fab-wrapper">
+      {(activeRoll || displayRoll !== null) && (
+        <div key={toastKey} className="dice-toast" role="status" aria-live="polite">
+          <div className="dice-toast__header">
+            <span className="dice-toast__label">Última rolagem</span>
+            {displayRoll === null && activeRoll && (
+              <span className="dice-toast__formula">{activeRoll.formula ?? activeRoll.die_type}</span>
+            )}
+          </div>
+
+          <div className="dice-toast__total-row">
+            <span className={displayRoll !== null ? 'dice-toast__total dice-toast__total--spinning' : totalClass(activeRoll!)}>
+              {displayRoll !== null ? displayRoll : activeRoll!.result}
+            </span>
+          </div>
+
+          {displayRoll === null && activeRoll?.roll_breakdown && activeRoll.roll_breakdown.length > 0 && (
+            <ToastBreakdown breakdown={activeRoll.roll_breakdown} />
+          )}
+        </div>
+      )}
+
+      {isOpen && (
+        <div className="dice-fab__popover" role="dialog" aria-label="Rolagem de dados">
+          <div className="dice-fab__popover-header">
+            <span className="dice-fab__popover-icon" aria-hidden="true">⬡</span>
+            <span className="dice-fab__popover-title">Rolagem de dados</span>
+            <button
+              type="button"
+              className="dice-fab__popover-close"
+              onClick={close}
+              aria-label="Fechar rolagem de dados"
+            >
+              ✕
+            </button>
+          </div>
+          <DiceRollerPanel campaignId={campaignId} currentUserId={user.id} onRoll={handleRoll} />
+        </div>
+      )}
+
+      <button
+        type="button"
+        className="dice-fab"
+        onClick={() => (isOpen ? close() : open())}
+        aria-label={isOpen ? 'Fechar rolagem de dados' : 'Abrir rolagem de dados'}
+        aria-expanded={isOpen}
+      >
+        <span aria-hidden="true">⬡</span>
+      </button>
+    </div>
+  )
+}

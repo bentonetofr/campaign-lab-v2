@@ -2,6 +2,8 @@ import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { ThemeToggle } from '../../shared/components/ThemeToggle'
 import { AppLogo }     from '../../shared/components/AppLogo'
+import { DiceRollerProvider } from '../../features/dice/DiceRollerProvider'
+import { DiceFab }            from '../../features/dice/components/DiceFab'
 import './PrivateLayout.css'
 
 export function PrivateLayout() {
@@ -21,6 +23,7 @@ export function PrivateLayout() {
   }
 
   return (
+    <DiceRollerProvider>
     <div className="private-layout">
       {/* ── Sidebar (desktop) ── */}
       <aside className="sidebar">
@@ -118,5 +121,7 @@ export function PrivateLayout() {
         <Outlet />
       </main>
     </div>
+    <DiceFab />
+    </DiceRollerProvider>
   )
 }

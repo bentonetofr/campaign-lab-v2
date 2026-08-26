@@ -5,7 +5,7 @@ import {
   parseDiceFormula,
   rollDice,
 } from '../services/diceService'
-import type { DiceRoll, DiceRollWithProfile, RollBreakdownItem } from '../../../shared/types'
+import type { DiceRoll, DiceRollWithProfile } from '../../../shared/types'
 import './DiceRollerPanel.css'
 
 // ────────────────────────────────────────────────────────
@@ -15,7 +15,13 @@ import './DiceRollerPanel.css'
 interface DiceRollerPanelProps {
   campaignId: string
   currentUserId: string
+  /** Chamado com a rolagem assim que ela é registrada — o DiceFab exibe o resultado como notificação. */
+  onRoll: (roll: DiceRoll) => void
 }
+
+// Quantas rolagens recentes aparecem no popover — histórico completo
+// continua acessível pela aba Atividade da campanha.
+const RECENT_ROLLS_LIMIT = 3
 
 // ────────────────────────────────────────────────────────
 // Utilitários de display
@@ -38,66 +44,15 @@ function signStr(n: number): string {
 }
 
 // ────────────────────────────────────────────────────────
-// Sub-componentes
-// ────────────────────────────────────────────────────────
-
-function BreakdownDetail({ breakdown }: { breakdown: RollBreakdownItem[] }) {
-  const diceTerms = breakdown.filter((b) => b.type !== 'modifier')
-  const modTerm   = breakdown.find(
-    (b): b is Extract<RollBreakdownItem, { type: 'modifier' }> => b.type === 'modifier'
-  )
-
-  return (
-    <dl className="dice-breakdown">
-      {diceTerms.map((item, idx) => {
-        if (item.type === 'sum') {
-          return (
-            <div key={idx} className="dice-breakdown__row">
-              <dt className="dice-breakdown__label">{item.notation}</dt>
-              <dd className="dice-breakdown__value">
-                {item.results.join(', ')}
-                {item.quantity > 1 && (
-                  <span className="dice-breakdown__sub"> = {item.subtotal}</span>
-                )}
-              </dd>
-            </div>
-          )
-        }
-        if (item.type === 'keep_highest') {
-          return (
-            <div key={idx} className="dice-breakdown__row">
-              <dt className="dice-breakdown__label">{item.notation}</dt>
-              <dd className="dice-breakdown__value">
-                {item.results.join(', ')}
-                <span className="dice-breakdown__sub"> → maior: {item.kept}</span>
-              </dd>
-            </div>
-          )
-        }
-        return null
-      })}
-      {modTerm && (
-        <div className="dice-breakdown__row">
-          <dt className="dice-breakdown__label">Modificador</dt>
-          <dd className="dice-breakdown__value">{signStr(modTerm.value)}</dd>
-        </div>
-      )}
-    </dl>
-  )
-}
-
-// ────────────────────────────────────────────────────────
 // Componente principal
 // ────────────────────────────────────────────────────────
 
-const EXAMPLE_FORMULAS = ['2d6+3', '2#d20', '1#d3+4']
+const EXAMPLE_FORMULAS = ['2d6+3', '2#d20', '2~d20', '1#d3+4']
 
-export function DiceRollerPanel({ campaignId, currentUserId }: DiceRollerPanelProps) {
+export function DiceRollerPanel({ campaignId, currentUserId, onRoll }: DiceRollerPanelProps) {
   // ── Rolagem ──
-  const [rolling, setRolling]   = useState(false)
+  const [rolling, setRolling]     = useState(false)
   const [rollError, setRollError] = useState<string | null>(null)
-  const [lastRoll, setLastRoll] = useState<DiceRoll | null>(null)
-  const [animKey, setAnimKey]   = useState(0)
 
   // ── Campo personalizado ──
   const [customFormula, setCustomFormula] = useState('')
@@ -115,7 +70,7 @@ export function DiceRollerPanel({ campaignId, currentUserId }: DiceRollerPanelPr
     if (refresh) setHistRefreshing(true)
     else { setHistLoading(true); setHistError(null) }
     try {
-      const data = await getCampaignRolls(campaignId)
+      const data = await getCampaignRolls(campaignId, RECENT_ROLLS_LIMIT)
       setHistory(data)
       setHistError(null)
     } catch (err) {
@@ -135,8 +90,7 @@ export function DiceRollerPanel({ campaignId, currentUserId }: DiceRollerPanelPr
     setRolling(true)
     try {
       const roll = await rollDice(campaignId, formula)
-      setLastRoll(roll)
-      setAnimKey((k) => k + 1)
+      onRoll(roll)
       await loadHistory(true)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Não foi possível registrar a rolagem.'
@@ -175,176 +129,128 @@ export function DiceRollerPanel({ campaignId, currentUserId }: DiceRollerPanelPr
     inputRef.current?.focus()
   }
 
-  // ── Determina classes do total ──
-  function totalClass(roll: DiceRoll): string {
-    const breakdown = roll.roll_breakdown
-    if (!breakdown) return 'dice-last-roll__total'
-    // crit: apenas 1 termo de dado com qty=1, sem modifier, resultado = sides
-    const diceTerms = breakdown.filter((b) => b.type !== 'modifier')
-    if (diceTerms.length === 1) {
-      const t = diceTerms[0]
-      if ('sides' in t) {
-        const noMod = !breakdown.some((b) => b.type === 'modifier')
-        if (t.quantity === 1 && t.results[0] === t.sides && noMod) {
-          return 'dice-last-roll__total dice-last-roll__total--max'
-        }
-        if (t.quantity === 1 && t.results[0] === 1 && noMod) {
-          return 'dice-last-roll__total dice-last-roll__total--min'
-        }
-      }
-    }
-    return 'dice-last-roll__total'
-  }
-
   // ────────────────────────────────────────────────────
   return (
-    <section className="dice-panel">
-      <header className="dice-panel__header">
-        <div className="dice-panel__title-row">
-          <span className="dice-panel__icon" aria-hidden="true">⬡</span>
-          <h3 className="dice-panel__title">Rolagem de Dados</h3>
+    <div className="dice-panel__body">
+
+      {/* ── Rolagem rápida ── */}
+      <div className="dice-section">
+        <h4 className="dice-section__title">Rolagem rápida</h4>
+        <div className="quick-roll-btns" role="group" aria-label="Rolagem rápida">
+          {QUICK_FORMULAS.map((f) => (
+            <button
+              key={f}
+              className="quick-roll-btn"
+              onClick={() => handleQuickRoll(f)}
+              disabled={rolling}
+              aria-label={`Rolar ${f}`}
+            >
+              {f}
+            </button>
+          ))}
         </div>
-      </header>
+      </div>
 
-      <div className="dice-panel__body">
+      {/* ── Rolagem personalizada ── */}
+      <div className="dice-section">
+        <h4 className="dice-section__title">Rolagem personalizada</h4>
+        <div className="dice-custom">
+          <div className="dice-custom__input-row">
+            <input
+              ref={inputRef}
+              type="text"
+              className={`input dice-custom__text-input ${formulaError ? 'dice-custom__text-input--error' : ''}`}
+              placeholder="Digite uma fórmula"
+              value={customFormula}
+              onChange={(e) => { setCustomFormula(e.target.value); setFormulaError(null) }}
+              onKeyDown={handleFormulaKeyDown}
+              disabled={rolling}
+              aria-label="Fórmula personalizada"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={80}
+            />
+            <button
+              className="btn btn-primary dice-custom__roll-btn"
+              onClick={handleCustomRoll}
+              disabled={rolling}
+            >
+              {rolling
+                ? <><span className="spinner spinner--sm" /> Rolando...</>
+                : 'Rolar'
+              }
+            </button>
+          </div>
 
-        {/* ── Rolagem rápida ── */}
-        <div className="dice-section">
-          <h4 className="dice-section__title">Rolagem rápida</h4>
-          <div className="quick-roll-btns" role="group" aria-label="Rolagem rápida">
-            {QUICK_FORMULAS.map((f) => (
+          <div className="dice-custom__examples">
+            <span className="dice-custom__examples-label">Exemplos:</span>
+            {EXAMPLE_FORMULAS.map((f) => (
               <button
                 key={f}
-                className="quick-roll-btn"
-                onClick={() => handleQuickRoll(f)}
+                type="button"
+                className="dice-custom__example-chip"
+                onClick={() => useExample(f)}
                 disabled={rolling}
-                aria-label={`Rolar ${f}`}
               >
                 {f}
               </button>
             ))}
           </div>
+
+          {formulaError && (
+            <div className="dice-feedback dice-feedback--error" role="alert">
+              {formulaError}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Erro de rolagem ── */}
+      {rollError && (
+        <div className="dice-feedback dice-feedback--error" role="alert">
+          {rollError}
+        </div>
+      )}
+
+      {/* ── Histórico ── */}
+      <div className="dice-section dice-history">
+        <div className="dice-history__header">
+          <h4
+            className="dice-section__title"
+            style={{ borderBottom: 'none', marginBottom: 0 }}
+          >
+            <span aria-hidden="true">◎</span> Recentes
+          </h4>
+          <button
+            className="btn btn-ghost dice-history__refresh-btn"
+            onClick={() => loadHistory(true)}
+            disabled={histRefreshing || histLoading}
+          >
+            {histRefreshing
+              ? <><span className="spinner spinner--sm" /> Atualizando...</>
+              : 'Atualizar'
+            }
+          </button>
         </div>
 
-        {/* ── Rolagem personalizada ── */}
-        <div className="dice-section">
-          <h4 className="dice-section__title">Rolagem personalizada</h4>
-          <div className="dice-custom">
-            <div className="dice-custom__input-row">
-              <input
-                ref={inputRef}
-                type="text"
-                className={`input dice-custom__text-input ${formulaError ? 'dice-custom__text-input--error' : ''}`}
-                placeholder="Ex: 2d6+3, 2#d20, 1#d3+4"
-                value={customFormula}
-                onChange={(e) => { setCustomFormula(e.target.value); setFormulaError(null) }}
-                onKeyDown={handleFormulaKeyDown}
-                disabled={rolling}
-                aria-label="Fórmula personalizada"
-                autoComplete="off"
-                autoCorrect="off"
-                spellCheck={false}
-                maxLength={80}
-              />
-              <button
-                className="btn btn-primary dice-custom__roll-btn"
-                onClick={handleCustomRoll}
-                disabled={rolling}
-              >
-                {rolling
-                  ? <><span className="spinner spinner--sm" /> Rolando...</>
-                  : 'Rolar'
-                }
-              </button>
-            </div>
-
-            <div className="dice-custom__examples">
-              <span className="dice-custom__examples-label">Exemplos:</span>
-              {EXAMPLE_FORMULAS.map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  className="dice-custom__example-chip"
-                  onClick={() => useExample(f)}
-                  disabled={rolling}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-
-            {formulaError && (
-              <div className="dice-feedback dice-feedback--error" role="alert">
-                {formulaError}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Erro de rolagem ── */}
-        {rollError && (
-          <div className="dice-feedback dice-feedback--error" role="alert">
-            {rollError}
+        {histLoading && (
+          <div className="dice-history__loading">
+            <div className="spinner spinner--sm" />
+            <span>Carregando...</span>
           </div>
         )}
 
-        {/* ── Última rolagem ── */}
-        {lastRoll && (
-          <div key={animKey} className="dice-last-roll" aria-live="polite" aria-label="Última rolagem">
-            <div className="dice-last-roll__header">
-              <span className="dice-last-roll__label">Última rolagem</span>
-              <span className="dice-last-roll__formula">{lastRoll.formula ?? lastRoll.die_type}</span>
-            </div>
-
-            <div className="dice-last-roll__total-row">
-              <span className={totalClass(lastRoll)}>
-                {lastRoll.result}
-              </span>
-            </div>
-
-            {lastRoll.roll_breakdown && lastRoll.roll_breakdown.length > 0 && (
-              <BreakdownDetail breakdown={lastRoll.roll_breakdown} />
-            )}
-          </div>
+        {!histLoading && histError && (
+          <div className="dice-feedback dice-feedback--error">{histError}</div>
         )}
 
-        {/* ── Histórico ── */}
-        <div className="dice-section dice-history">
-          <div className="dice-history__header">
-            <h4
-              className="dice-section__title"
-              style={{ borderBottom: 'none', marginBottom: 0 }}
-            >
-              <span aria-hidden="true">◎</span> Histórico
-            </h4>
-            <button
-              className="btn btn-ghost dice-history__refresh-btn"
-              onClick={() => loadHistory(true)}
-              disabled={histRefreshing || histLoading}
-            >
-              {histRefreshing
-                ? <><span className="spinner spinner--sm" /> Atualizando...</>
-                : 'Atualizar histórico'
-              }
-            </button>
-          </div>
+        {!histLoading && !histError && history.length === 0 && (
+          <p className="dice-history__empty">Nenhuma rolagem registrada nesta campanha.</p>
+        )}
 
-          {histLoading && (
-            <div className="dice-history__loading">
-              <div className="spinner spinner--sm" />
-              <span>Carregando...</span>
-            </div>
-          )}
-
-          {!histLoading && histError && (
-            <div className="dice-feedback dice-feedback--error">{histError}</div>
-          )}
-
-          {!histLoading && !histError && history.length === 0 && (
-            <p className="dice-history__empty">Nenhuma rolagem registrada nesta campanha.</p>
-          )}
-
-          {!histLoading && history.length > 0 && (
+        {!histLoading && history.length > 0 && (
+          <>
             <ul className="dice-history__list" aria-label="Histórico de rolagens">
               {history.map((roll) => {
                 const isOwn = roll.user_id === currentUserId
@@ -380,7 +286,7 @@ export function DiceRollerPanel({ campaignId, currentUserId }: DiceRollerPanelPr
                               </span>
                             )
                           }
-                          if (t.type === 'keep_highest') {
+                          if (t.type === 'keep_highest' || t.type === 'keep_lowest') {
                             return (
                               <span key={idx}>
                                 {t.notation}: {t.results.join(', ')} → {t.kept}
@@ -401,10 +307,13 @@ export function DiceRollerPanel({ campaignId, currentUserId }: DiceRollerPanelPr
                 )
               })}
             </ul>
-          )}
-        </div>
-
+            <p className="dice-history__full-log-hint">
+              Histórico completo na aba Atividade.
+            </p>
+          </>
+        )}
       </div>
-    </section>
+
+    </div>
   )
 }

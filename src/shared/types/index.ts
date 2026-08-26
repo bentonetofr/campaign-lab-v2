@@ -85,7 +85,7 @@ export interface SheetWithProfile extends CharacterSheet {
 }
 
 export type DieType  = 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100'
-export type RollMode = 'sum' | 'keep_highest'
+export type RollMode = 'sum' | 'keep_highest' | 'keep_lowest'
 
 export type RollBreakdownItem =
   | {
@@ -98,6 +98,15 @@ export type RollBreakdownItem =
     }
   | {
       type: 'keep_highest'
+      notation: string
+      quantity: number
+      sides: number
+      results: number[]
+      kept: number
+      subtotal: number
+    }
+  | {
+      type: 'keep_lowest'
       notation: string
       quantity: number
       sides: number

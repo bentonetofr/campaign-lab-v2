@@ -2,29 +2,13 @@
    Rolagem de Dados — Stitch Medieval Dark v2
    ═══════════════════════════════════════════════════════ */
 
-.dice-panel {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-dim);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  transition: border-color var(--transition-base);
-}
-.dice-panel:hover { border-color: var(--gilded); }
-
-.dice-panel__header {
-  padding: var(--space-5) var(--space-6);
-  border-bottom: 1px solid var(--border-dim);
-  background: var(--bg-elevated);
-}
-.dice-panel__title-row { display: flex; align-items: center; gap: var(--space-3); }
-.dice-panel__icon  { font-size: var(--text-lg); color: var(--accent-dim); }
-.dice-panel__title { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 600; }
-
 .dice-panel__body {
-  padding: var(--space-6);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-4);
+  overflow-y: auto;
+  max-height: min(420px, calc(100vh - 200px));
 }
 
 /* ── Seções ── */
@@ -161,107 +145,6 @@
 /* ── Botão de rolar ── */
 .dice-roll-btn { padding: var(--space-3) var(--space-8); font-size: var(--text-md); align-self: flex-start; }
 
-/* ── Última rolagem ── */
-.dice-last-roll {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-base);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  animation: rollIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
-}
-
-.dice-last-roll__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.dice-last-roll__label {
-  font-family: var(--font-label);
-  font-size: var(--text-xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.dice-last-roll__formula {
-  font-family: var(--font-mono);
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--accent-dim);
-}
-
-.dice-last-roll__total-row {
-  display: flex;
-  justify-content: center;
-}
-
-.dice-last-roll__total {
-  font-family: var(--font-display);
-  font-size: var(--text-5xl);
-  font-weight: 700;
-  line-height: 1;
-  color: var(--text-primary);
-  padding: var(--space-4) var(--space-8);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-base);
-  border-radius: 50%;
-  min-width: 120px;
-  min-height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.dice-last-roll__total--max {
-  border-color: var(--accent-bright);
-  color: var(--accent-bright);
-  box-shadow: 0 0 24px rgba(212, 175, 55, 0.3);
-  animation: rollInCrit 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
-}
-.dice-last-roll__total--min {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-/* ── Breakdown ── */
-.dice-breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin: 0;
-  border-top: 1px solid var(--border-dim);
-  padding-top: var(--space-3);
-}
-
-.dice-breakdown__row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--space-3);
-  font-size: var(--text-md);
-  padding: var(--space-1) 0;
-}
-.dice-breakdown__label {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-.dice-breakdown__value {
-  font-family: var(--font-mono);
-  font-size: var(--text-md);
-  color: var(--text-secondary);
-  text-align: right;
-}
-.dice-breakdown__sub {
-  color: var(--accent-dim);
-  font-size: var(--text-xs);
-}
-
 /* ── Histórico ── */
 .dice-history { /* extends .dice-section */ }
 
@@ -297,10 +180,13 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  max-height: 320px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-base) transparent;
+}
+
+.dice-history__full-log-hint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-align: center;
+  margin: var(--space-2) 0 0;
 }
 
 .dice-history__row {
@@ -383,22 +269,8 @@
   text-align: right;
 }
 
-/* ── Animações ── */
-@keyframes rollIn {
-  0%   { transform: scale(0.6) rotate(-8deg); opacity: 0; }
-  70%  { transform: scale(1.05) rotate(2deg); }
-  100% { transform: scale(1) rotate(0); opacity: 1; }
-}
-@keyframes rollInCrit {
-  0%   { transform: scale(0.5) rotate(-12deg); opacity: 0; }
-  60%  { transform: scale(1.12) rotate(4deg); }
-  80%  { transform: scale(0.97) rotate(-1deg); }
-  100% { transform: scale(1) rotate(0); opacity: 1; }
-}
-
 @media (max-width: 480px) {
   .quick-roll-btns { gap: var(--space-1); }
   .quick-roll-btn  { padding: var(--space-2) var(--space-3); }
   .dice-custom__input-row { flex-direction: column; }
-  .dice-last-roll__total { min-width: 96px; min-height: 96px; font-size: var(--text-4xl); }
 }

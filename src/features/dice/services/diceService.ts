@@ -15,7 +15,7 @@ export const QUICK_FORMULAS = DIE_TYPES.map((d) => `1${d}`)
 // ────────────────────────────────────────────────────────
 
 export interface ParsedDiceTerm {
-  type: 'sum' | 'keep_highest'
+  type: 'sum' | 'keep_highest' | 'keep_lowest'
   quantity: number
   sides: number
   notation: string
@@ -36,7 +36,10 @@ export interface ParsedFormula {
  *   number   = [1-9][0-9]*
  *
  * Exemplos válidos:
- *   1d20  2d6+3  3d4-1  2#d20  1#d3+4  3#d6+2  2#d20+1d4+3
+ *   1d20  2d6+3  3d4-1  2#d20  1#d3+4  3#d6+2  2#d20+1d4+3  2~d20
+ *
+ * O operador '~' funciona como o '#', mas mantém o MENOR resultado
+ * em vez do maior (ex: 2~d20 rola 2d20 e mantém o menor).
  */
 export function parseDiceFormula(raw: string): ParsedFormula {
   const input = raw.trim()
@@ -44,9 +47,9 @@ export function parseDiceFormula(raw: string): ParsedFormula {
   if (input.length === 0)       throw new Error('Fórmula inválida.')
   if (input.length > 80)        throw new Error('A fórmula é muito longa.')
 
-  // Permitir apenas: dígitos, d/D, #, +, -, espaço
-  if (/[^0-9dD#+\-\s]/.test(input)) {
-    throw new Error('Use apenas dados, números, +, - e #.')
+  // Permitir apenas: dígitos, d/D, #, ~, +, -, espaço
+  if (/[^0-9dD#~+\-\s]/.test(input)) {
+    throw new Error('Use apenas dados, números, +, -, # e ~.')
   }
 
   // Normalizar: minúsculas, sem espaços
@@ -83,6 +86,23 @@ export function parseDiceFormula(raw: string): ParsedFormula {
       if (totalDiceCount > 100)       throw new Error('Quantidade de dados acima do limite.')
       const notation = `${khQty}#d${sides}`
       terms.push({ type: 'keep_highest', quantity: khQty, sides, notation })
+      continue
+    }
+
+    // keep_lowest: qty~[qty]d<sides>  ex: 2~d20, 2~2d20
+    const keepLowMatch = body.match(/^(\d+)~(\d*)d(\d+)$/)
+    if (keepLowMatch) {
+      if (sign < 0) throw new Error('Fórmula inválida.')
+      const klQty  = parseInt(keepLowMatch[1], 10)
+      const dQty   = keepLowMatch[2] ? parseInt(keepLowMatch[2], 10) : 1
+      const sides  = parseInt(keepLowMatch[3], 10)
+      if (klQty < 1 || klQty > 100)  throw new Error('Quantidade de dados acima do limite.')
+      if (dQty !== 1)                 throw new Error('Ao usar ~, o segundo operando deve ser 1 dado (ex: 2~d20).')
+      if (sides < 2 || sides > 1000) throw new Error('Número de lados do dado acima do limite.')
+      totalDiceCount += klQty
+      if (totalDiceCount > 100)       throw new Error('Quantidade de dados acima do limite.')
+      const notation = `${klQty}~d${sides}`
+      terms.push({ type: 'keep_lowest', quantity: klQty, sides, notation })
       continue
     }
 
@@ -161,6 +181,19 @@ export function rollParsedFormula(parsed: ParsedFormula): RollResult {
         subtotal,
       })
       total += subtotal
+    } else if (term.type === 'keep_lowest') {
+      const kept     = Math.min(...results)
+      const subtotal = kept
+      breakdown.push({
+        type: 'keep_lowest',
+        notation: term.notation,
+        quantity: term.quantity,
+        sides: term.sides,
+        results,
+        kept,
+        subtotal,
+      })
+      total += subtotal
     } else {
       const subtotal = results.reduce((a, b) => a + b, 0)
       breakdown.push({
@@ -190,10 +223,12 @@ export function rollParsedFormula(parsed: ParsedFormula): RollResult {
     if (parseInt(d.slice(1), 10) === legacyDieSides) { legacyDieType = d; break }
   }
 
-  const legacyRollMode: RollMode = firstDiceTerm.type === 'keep_highest' ? 'keep_highest' : 'sum'
+  const legacyRollMode: RollMode =
+    firstDiceTerm.type === 'keep_highest' ? 'keep_highest' :
+    firstDiceTerm.type === 'keep_lowest'  ? 'keep_lowest'  : 'sum'
   const legacyKeptItem = breakdown.find(
-    (b): b is RollBreakdownItem & { type: 'keep_highest'; kept: number } =>
-      b.type === 'keep_highest'
+    (b): b is RollBreakdownItem & { type: 'keep_highest' | 'keep_lowest'; kept: number } =>
+      b.type === 'keep_highest' || b.type === 'keep_lowest'
   )
 
   return {

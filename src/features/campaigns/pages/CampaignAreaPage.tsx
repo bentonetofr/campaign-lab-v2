@@ -9,7 +9,6 @@ import { CampaignOverviewPanel }  from '../components/CampaignOverviewPanel'
 import { CampaignMembersPanel }   from '../../members/components/CampaignMembersPanel'
 import { CampaignSessionsPanel }  from '../../sessions/components/CampaignSessionsPanel'
 import { CampaignSheetPanel }     from '../../sheets/components/CampaignSheetPanel'
-import { DiceRollerPanel }        from '../../dice/components/DiceRollerPanel'
 import { CampaignSettingsPanel }  from '../components/CampaignSettingsPanel'
 import { CampaignActivityPanel }  from '../../activity/components/CampaignActivityPanel'
 import { CampaignNotesPanel }     from '../../notes/components/CampaignNotesPanel'
@@ -20,7 +19,7 @@ import './CampaignPages.css'
 // Abas disponíveis — exportado para uso no CampaignOverviewPanel
 // ────────────────────────────────────────────────────────
 
-export type TabId = 'visao-geral' | 'membros' | 'sessoes' | 'ficha' | 'rolagem' | 'notas' | 'atividade' | 'configuracoes'
+export type TabId = 'visao-geral' | 'membros' | 'sessoes' | 'ficha' | 'notas' | 'atividade' | 'configuracoes'
 
 interface Tab {
   id: TabId
@@ -33,7 +32,6 @@ const TABS: Tab[] = [
   { id: 'membros',       label: 'Membros',        icon: '⚔' },
   { id: 'sessoes',       label: 'Sessões',        icon: '✦' },
   { id: 'ficha',         label: 'Ficha',          icon: '📜' },
-  { id: 'rolagem',       label: 'Rolagem',        icon: '⬡' },
   { id: 'notas',         label: 'Notas',          icon: '◇' },
   { id: 'atividade',     label: 'Atividade',      icon: '◉' },
   { id: 'configuracoes', label: 'Configurações',  icon: '◈' },
@@ -218,22 +216,6 @@ export function CampaignAreaPage() {
         {activeTab === 'ficha' && (
           <CampaignSheetPanel
             campaign={campaign}
-            currentUserId={user!.id}
-          />
-        )}
-      </div>
-
-      {/* ── Rolagem ── */}
-      <div
-        id="tabpanel-rolagem"
-        role="tabpanel"
-        aria-labelledby="tab-rolagem"
-        hidden={activeTab !== 'rolagem'}
-        className="animate-fade-up"
-      >
-        {activeTab === 'rolagem' && (
-          <DiceRollerPanel
-            campaignId={campaign.id}
             currentUserId={user!.id}
           />
         )}
