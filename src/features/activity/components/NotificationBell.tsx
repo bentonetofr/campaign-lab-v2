@@ -1,61 +1,147 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
-import { getActivitySeenAt, getUnreadNotificationCount, markActivitySeen } from '../services/activityService'
+import {
+  getActivitySeenAt,
+  getRecentNotifications,
+  getUnreadNotificationCount,
+  markActivitySeen,
+  type LiveNotification,
+} from '../services/activityService'
 import './NotificationBell.css'
 
-// Cadência do polling — mesma da heartbeat de presença de campanha, sem Realtime.
+// Cadência do selo — mais devagar que o pop-up ao vivo, é só o "de fundo".
 const POLL_INTERVAL_MS = 75_000
+
+function formatRelativeTime(iso: string): string {
+  const diff    = Date.now() - new Date(iso).getTime()
+  const seconds = Math.floor(diff / 1000)
+  if (seconds < 5)   return 'agora'
+  if (seconds < 60)  return `${seconds}s atrás`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60)  return `${minutes}min atrás`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24)    return `${hours}h atrás`
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+}
 
 export function NotificationBell() {
   const { user } = useAuth()
-  const navigate = useNavigate()
-  const [count, setCount] = useState(0)
+  const [count, setCount]     = useState(0)
+  const [isOpen, setIsOpen]   = useState(false)
+  const [items, setItems]     = useState<LiveNotification[]>([])
+  const [loading, setLoading] = useState(false)
 
-  const refresh = useCallback(async () => {
+  const refreshCount = useCallback(async () => {
     try {
       const seenAt = await getActivitySeenAt()
       const unread = await getUnreadNotificationCount(seenAt)
       setCount(unread)
-    } catch {
-      // silencioso — o selo só deixa de atualizar, não quebra a tela
+    } catch (err) {
+      console.error('Falha ao carregar contagem de notificações:', err)
     }
   }, [])
 
   useEffect(() => {
     if (!user) return
-    refresh()
-    const interval = setInterval(refresh, POLL_INTERVAL_MS)
+    refreshCount()
+    const interval = setInterval(refreshCount, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
-  }, [user, refresh])
+  }, [user, refreshCount])
 
-  async function handleClick() {
+  async function handleToggle() {
+    const opening = !isOpen
+    setIsOpen(opening)
+    if (!opening) return
+
+    setLoading(true)
+    try {
+      setItems(await getRecentNotifications(5))
+    } catch (err) {
+      console.error('Falha ao carregar notificações recentes:', err)
+    } finally {
+      setLoading(false)
+    }
+
     setCount(0)
-    navigate('/atividade')
     try { await markActivitySeen() } catch { /* silencioso */ }
   }
 
   if (!user) return null
 
   return (
-    <button
-      type="button"
-      className="notification-bell"
-      onClick={handleClick}
-      aria-label={count > 0 ? `${count} notificações novas` : 'Notificações'}
-    >
-      <svg
-        width="20" height="20" viewBox="0 0 24 24"
-        fill="none" stroke="currentColor" strokeWidth="2"
-        strokeLinecap="round" strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-      </svg>
-      {count > 0 && (
-        <span className="notification-bell__badge">{count > 99 ? '99+' : count}</span>
+    <>
+      {isOpen && (
+        <div className="notification-bell__popover" role="dialog" aria-label="Notificações">
+          <div className="notification-bell__popover-header">
+            <svg
+              width="16" height="16" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            <span className="notification-bell__popover-title">Notificações</span>
+            <button
+              type="button"
+              className="notification-bell__popover-close"
+              onClick={() => setIsOpen(false)}
+              aria-label="Fechar notificações"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="notification-bell__list">
+            {loading && (
+              <div className="notification-bell__loading">
+                <div className="spinner spinner--sm" />
+                <span>Carregando...</span>
+              </div>
+            )}
+
+            {!loading && items.length === 0 && (
+              <p className="notification-bell__empty">Nenhuma notificação ainda.</p>
+            )}
+
+            {!loading && items.length > 0 && (
+              <ul className="notification-bell__items">
+                {items.map((item) => (
+                  <li key={item.id} className="notification-bell__item">
+                    <p className="notification-bell__item-message">{item.message}</p>
+                    <div className="notification-bell__item-meta">
+                      <span>{item.campaignName}</span>
+                      <span>{formatRelativeTime(item.createdAt)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       )}
-    </button>
+
+      <button
+        type="button"
+        className="notification-bell"
+        onClick={handleToggle}
+        aria-label={count > 0 ? `${count} notificações novas` : 'Notificações'}
+        aria-expanded={isOpen}
+      >
+        <svg
+          width="20" height="20" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+        {count > 0 && (
+          <span className="notification-bell__badge">{count > 99 ? '99+' : count}</span>
+        )}
+      </button>
+    </>
   )
 }

@@ -282,6 +282,37 @@ export interface LiveNotification {
 
 const POPUP_ACTIVITY_TYPES: ActivityType[] = ['note_created', 'session_created']
 
+type ActivityRow = { id: string; message: string; created_at: string; campaigns: { name: string } | null }
+type DiceRow = { id: string; formula: string | null; die_type: string; result: number; created_at: string; campaigns: { name: string } | null; profiles: { display_name: string } | null }
+type MemberRow = { id: string; created_at: string; campaigns: { name: string } | null }
+
+function mapActivityRow(row: ActivityRow): LiveNotification {
+  return {
+    id:           `activity-${row.id}`,
+    message:      row.message,
+    campaignName: row.campaigns?.name ?? 'Campanha',
+    createdAt:    row.created_at,
+  }
+}
+
+function mapDiceRow(row: DiceRow): LiveNotification {
+  return {
+    id:           `dice-${row.id}`,
+    message:      `${row.profiles?.display_name ?? 'Alguém'} rolou ${row.formula ?? row.die_type}: ${row.result}`,
+    campaignName: row.campaigns?.name ?? 'Campanha',
+    createdAt:    row.created_at,
+  }
+}
+
+function mapMemberRow(row: MemberRow): LiveNotification {
+  return {
+    id:           `member-${row.id}`,
+    message:      'Você foi adicionado à campanha.',
+    campaignName: row.campaigns?.name ?? 'Campanha',
+    createdAt:    row.created_at,
+  }
+}
+
 /**
  * Busca eventos novos desde `since` para virar pop-up. Diferente do selo,
  * rolagem oculta nunca aparece aqui (nem pro mestre) — só rolagem pública.
@@ -316,39 +347,46 @@ export async function getLiveNotifications(since: string): Promise<LiveNotificat
       .order('created_at', { ascending: true }),
   ])
 
-  type ActivityRow = { id: string; message: string; created_at: string; campaigns: { name: string } | null }
-  type DiceRow = { id: string; formula: string | null; die_type: string; result: number; created_at: string; campaigns: { name: string } | null; profiles: { display_name: string } | null }
-  type MemberRow = { id: string; created_at: string; campaigns: { name: string } | null }
-
-  const events: LiveNotification[] = []
-
-  for (const row of (activityRes.data ?? []) as unknown as ActivityRow[]) {
-    events.push({
-      id:           `activity-${row.id}`,
-      message:      row.message,
-      campaignName: row.campaigns?.name ?? 'Campanha',
-      createdAt:    row.created_at,
-    })
-  }
-
-  for (const row of (diceRes.data ?? []) as unknown as DiceRow[]) {
-    events.push({
-      id:           `dice-${row.id}`,
-      message:      `${row.profiles?.display_name ?? 'Alguém'} rolou ${row.formula ?? row.die_type}: ${row.result}`,
-      campaignName: row.campaigns?.name ?? 'Campanha',
-      createdAt:    row.created_at,
-    })
-  }
-
-  for (const row of (memberRes.data ?? []) as unknown as MemberRow[]) {
-    events.push({
-      id:           `member-${row.id}`,
-      message:      'Você foi adicionado à campanha.',
-      campaignName: row.campaigns?.name ?? 'Campanha',
-      createdAt:    row.created_at,
-    })
-  }
+  const events: LiveNotification[] = [
+    ...((activityRes.data ?? []) as unknown as ActivityRow[]).map(mapActivityRow),
+    ...((diceRes.data ?? []) as unknown as DiceRow[]).map(mapDiceRow),
+    ...((memberRes.data ?? []) as unknown as MemberRow[]).map(mapMemberRow),
+  ]
 
   events.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   return events
+}
+
+/**
+ * Busca as últimas notificações (independente de "visto"), pro painel do
+ * sino. Usa o mesmo conjunto de tipos que conta pro selo — mais amplo que
+ * o do pop-up ao vivo (inclui membro saiu/removido, sessão editada/cancelada).
+ */
+export async function getRecentNotifications(limit = 5): Promise<LiveNotification[]> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const [activityRes, diceRes] = await Promise.all([
+    supabase
+      .from('campaign_activity')
+      .select('id, message, created_at, campaigns(name)')
+      .in('type', NOTIFICATION_ACTIVITY_TYPES)
+      .neq('actor_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    supabase
+      .from('dice_rolls')
+      .select('id, formula, die_type, result, created_at, campaigns(name), profiles(display_name)')
+      .neq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+  ])
+
+  const events: LiveNotification[] = [
+    ...((activityRes.data ?? []) as unknown as ActivityRow[]).map(mapActivityRow),
+    ...((diceRes.data ?? []) as unknown as DiceRow[]).map(mapDiceRow),
+  ]
+
+  events.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return events.slice(0, limit)
 }

@@ -3,8 +3,9 @@ import { useAuth } from '../../auth/AuthProvider'
 import { getLiveNotifications, type LiveNotification } from '../services/activityService'
 import './NotificationPopup.css'
 
-// Mesma cadência do sino — sem Realtime.
-const POLL_INTERVAL_MS = 60_000
+// Mais rápido que o sino de propósito — é o mecanismo "ao vivo", quer parecer
+// imediato. Ainda sem Realtime, só um polling mais frequente.
+const POLL_INTERVAL_MS = 20_000
 // Quanto tempo cada pop-up fica visível antes de sumir.
 const POPUP_DURATION_MS = 5_000
 // Duração da animação de saída — soma dentro do tempo total acima.
@@ -27,13 +28,15 @@ export function NotificationPopup() {
     try {
       const events = await getLiveNotifications(since)
       if (events.length > 0) setQueue((q) => [...q, ...events])
-    } catch {
-      // silencioso — pop-up é só um "a mais", nunca deve quebrar a tela
+    } catch (err) {
+      // nunca quebra a tela por causa do pop-up, mas loga pra dar pra debugar
+      console.error('Falha ao buscar notificações ao vivo:', err)
     }
   }, [])
 
   useEffect(() => {
     if (!user) return
+    poll()
     const interval = setInterval(poll, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [user, poll])
