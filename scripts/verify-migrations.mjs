@@ -33,6 +33,7 @@ const expectedMigrations = [
   '20240129000000_dnd_equipment_catalog.sql',
   '20240130000000_dice_keep_lowest.sql',
   '20240131000000_dice_private_rolls.sql',
+  '20240132000000_notification_seen_at.sql',
 ]
 
 const actualMigrations = readdirSync(migrationDirectory)

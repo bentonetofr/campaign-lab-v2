@@ -5,6 +5,25 @@
   background: var(--bg-base);
 }
 
+/* ── Canto flutuante fixo (sino de notificações + botão de dados) ──
+   Envolve os dois como irmãos, empilhados de baixo pra cima na ordem do
+   DOM — o sino vem primeiro, então fica sempre por cima de qualquer coisa
+   do lado do dado (toast, popover aberto ou só o botão). */
+.dice-fab-wrapper {
+  position: fixed;
+  right: var(--space-6);
+  bottom: var(--space-6);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+@media (max-width: 480px) {
+  .dice-fab-wrapper { right: var(--space-4); bottom: var(--space-4); }
+}
+
 /* ── Sidebar — desktop ── */
 .sidebar {
   width: 256px;

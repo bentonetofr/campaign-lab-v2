@@ -1,17 +1,8 @@
 /* ═══════════════════════════════════════════════════════
    Botão flutuante de rolagem de dados
+   (a wrapper fixa — .dice-fab-wrapper — mora em PrivateLayout.css,
+   já que agora envolve o sino de notificações e o dado como irmãos)
    ═══════════════════════════════════════════════════════ */
-
-.dice-fab-wrapper {
-  position: fixed;
-  right: var(--space-6);
-  bottom: var(--space-6);
-  z-index: 500;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-3);
-}
 
 .dice-fab {
   width: 56px;
@@ -241,7 +232,6 @@
 }
 
 @media (max-width: 480px) {
-  .dice-fab-wrapper { right: var(--space-4); bottom: var(--space-4); }
   .dice-fab { width: 48px; height: 48px; font-size: var(--text-xl); }
   .dice-toast__total { min-width: 60px; min-height: 60px; font-size: var(--text-2xl); }
 }

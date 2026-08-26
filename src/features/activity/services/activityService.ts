@@ -200,3 +200,155 @@ export function formatActivityTime(iso: string): string {
   if (hours < 24)    return `${hours}h`
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
 }
+
+// ────────────────────────────────────────────────────────
+// Notificações
+// ────────────────────────────────────────────────────────
+
+/** Tipos de atividade que contam para o selo de notificação — o resto
+ *  (convites, campanha criada/atualizada, ficha atualizada) continua só
+ *  na aba Atividade, sem notificar. */
+const NOTIFICATION_ACTIVITY_TYPES: ActivityType[] = [
+  'member_joined', 'member_left', 'member_removed',
+  'session_created', 'session_updated', 'session_deleted',
+  'note_created',
+]
+
+/** Busca quando o usuário autenticado viu notificações pela última vez. */
+export async function getActivitySeenAt(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Usuário não autenticado.')
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('activity_seen_at')
+    .eq('id', user.id)
+    .single()
+
+  if (error) throw new Error('Não foi possível carregar notificações.')
+  return (data as { activity_seen_at: string }).activity_seen_at
+}
+
+/** Marca as notificações como vistas agora, para o usuário autenticado. */
+export async function markActivitySeen(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Usuário não autenticado.')
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ activity_seen_at: new Date().toISOString() })
+    .eq('id', user.id)
+
+  if (error) throw new Error('Não foi possível atualizar notificações.')
+}
+
+/**
+ * Conta eventos novos desde `seenAt`, em todas as campanhas do usuário.
+ * Rolagens de dados são contadas à parte (não via campaign_activity) —
+ * rolagens ocultas já não geram atividade (Etapa 2), e o RLS de dice_rolls
+ * decide sozinho quem enxerga uma rolagem de outra pessoa.
+ */
+export async function getUnreadNotificationCount(seenAt: string): Promise<number> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return 0
+
+  const [activityRes, diceRes] = await Promise.all([
+    supabase
+      .from('campaign_activity')
+      .select('id', { count: 'exact', head: true })
+      .in('type', NOTIFICATION_ACTIVITY_TYPES)
+      .neq('actor_id', user.id)
+      .gt('created_at', seenAt),
+    supabase
+      .from('dice_rolls')
+      .select('id', { count: 'exact', head: true })
+      .neq('user_id', user.id)
+      .gt('created_at', seenAt),
+  ])
+
+  if (activityRes.error || diceRes.error) return 0
+  return (activityRes.count ?? 0) + (diceRes.count ?? 0)
+}
+
+/** Um evento pronto para virar pop-up — já formatado, sem o consumidor
+ *  precisar saber de onde veio (campaign_activity, dice_rolls ou
+ *  campaign_members). */
+export interface LiveNotification {
+  id: string
+  message: string
+  campaignName: string
+  createdAt: string
+}
+
+const POPUP_ACTIVITY_TYPES: ActivityType[] = ['note_created', 'session_created']
+
+/**
+ * Busca eventos novos desde `since` para virar pop-up. Diferente do selo,
+ * rolagem oculta nunca aparece aqui (nem pro mestre) — só rolagem pública.
+ * "Fui adicionado a uma campanha" não dá pra pegar de forma confiável pelo
+ * actor_id de campaign_activity (varia se foi convite por e-mail ou link),
+ * então lê direto de campaign_members.
+ */
+export async function getLiveNotifications(since: string): Promise<LiveNotification[]> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const [activityRes, diceRes, memberRes] = await Promise.all([
+    supabase
+      .from('campaign_activity')
+      .select('id, message, created_at, campaigns(name)')
+      .in('type', POPUP_ACTIVITY_TYPES)
+      .neq('actor_id', user.id)
+      .gt('created_at', since)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('dice_rolls')
+      .select('id, formula, die_type, result, created_at, campaigns(name), profiles(display_name)')
+      .eq('is_private', false)
+      .neq('user_id', user.id)
+      .gt('created_at', since)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('campaign_members')
+      .select('id, created_at, campaigns(name)')
+      .eq('user_id', user.id)
+      .gt('created_at', since)
+      .order('created_at', { ascending: true }),
+  ])
+
+  type ActivityRow = { id: string; message: string; created_at: string; campaigns: { name: string } | null }
+  type DiceRow = { id: string; formula: string | null; die_type: string; result: number; created_at: string; campaigns: { name: string } | null; profiles: { display_name: string } | null }
+  type MemberRow = { id: string; created_at: string; campaigns: { name: string } | null }
+
+  const events: LiveNotification[] = []
+
+  for (const row of (activityRes.data ?? []) as unknown as ActivityRow[]) {
+    events.push({
+      id:           `activity-${row.id}`,
+      message:      row.message,
+      campaignName: row.campaigns?.name ?? 'Campanha',
+      createdAt:    row.created_at,
+    })
+  }
+
+  for (const row of (diceRes.data ?? []) as unknown as DiceRow[]) {
+    events.push({
+      id:           `dice-${row.id}`,
+      message:      `${row.profiles?.display_name ?? 'Alguém'} rolou ${row.formula ?? row.die_type}: ${row.result}`,
+      campaignName: row.campaigns?.name ?? 'Campanha',
+      createdAt:    row.created_at,
+    })
+  }
+
+  for (const row of (memberRes.data ?? []) as unknown as MemberRow[]) {
+    events.push({
+      id:           `member-${row.id}`,
+      message:      'Você foi adicionado à campanha.',
+      campaignName: row.campaigns?.name ?? 'Campanha',
+      createdAt:    row.created_at,
+    })
+  }
+
+  events.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  return events
+}

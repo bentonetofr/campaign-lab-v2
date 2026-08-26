@@ -1,0 +1,72 @@
+/* ═══════════════════════════════════════════════════════
+   Pop-up de notificação — some sozinho em 5s
+   ═══════════════════════════════════════════════════════ */
+
+.notification-popup {
+  position: relative;
+  overflow: hidden;
+  width: min(280px, calc(100vw - var(--space-8)));
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  animation: notification-popup-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.notification-popup--leaving {
+  animation: notification-popup-out 0.32s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.notification-popup__icon {
+  color: var(--accent-dim);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.notification-popup__body {
+  flex: 1;
+  min-width: 0;
+}
+.notification-popup__message {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.4;
+}
+.notification-popup__campaign {
+  font-family: var(--font-label);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: var(--space-1) 0 0;
+}
+
+.notification-popup__progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--gilded-bright);
+  transform-origin: left;
+  animation-name: notification-popup-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes notification-popup-in {
+  0%   { transform: translateY(18px) scale(0.94); opacity: 0; }
+  100% { transform: translateY(0)    scale(1);    opacity: 1; }
+}
+@keyframes notification-popup-out {
+  0%   { transform: translateY(0)   scale(1);    opacity: 1; }
+  100% { transform: translateY(-8px) scale(0.96); opacity: 0; }
+}
+@keyframes notification-popup-progress {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}

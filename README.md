@@ -101,7 +101,7 @@ Authentication → URL Configuration
 
 As migrations devem ser aplicadas **em ordem**, uma por vez, no **Supabase Dashboard → SQL Editor → New query**.
 
-O repositório contém **29 migrations SQL**. A lista abaixo é o contrato canônico da
+O repositório contém **30 migrations SQL**. A lista abaixo é o contrato canônico da
 ordem de aplicação; não existe uma migration `20240121000000_my_sheets.sql` neste
 repositório e ela não deve ser criada ou aplicada sem uma decisão explícita de
 schema.
@@ -137,6 +137,7 @@ schema.
 | 27 | `20240129000000_dnd_equipment_catalog.sql` | Catálogo estruturado de armas, armaduras, itens de aventura e ferramentas para a ficha D&D 5e |
 | 28 | `20240130000000_dice_keep_lowest.sql` | Adiciona `keep_lowest` (`roll_mode` e validação do `roll_breakdown`) — suporta o operador `~` (manter o menor) na fórmula de rolagem |
 | 29 | `20240131000000_dice_private_rolls.sql` | Adiciona `dice_rolls.is_private` e substitui a policy de SELECT — rolagens privadas só ficam visíveis para quem rolou e para o mestre da campanha |
+| 30 | `20240132000000_notification_seen_at.sql` | Adiciona `profiles.activity_seen_at` — marca quando o usuário viu notificações pela última vez |
 
 > **Usuários criados antes da migration 1:** o trigger `handle_new_user` cria perfis apenas para novos cadastros. Para sincronizar usuários já existentes, rode o script de backfill comentado na seção 9 da migration 1.
 
@@ -164,7 +165,7 @@ Antes de abrir um deploy ou adicionar uma migration, execute:
 npm run verify
 ```
 
-O comando valida as 29 migrations registradas e depois executa o build de produção.
+O comando valida as 30 migrations registradas e depois executa o build de produção.
 
 ---
 
@@ -211,6 +212,9 @@ O sistema de uma campanha é escolhido no momento da criação e **não pode ser
 | Rolagem personalizada por fórmula (`2d6+3`, `2#d20`, `2~d20`…) | ✅ |
 | Histórico de rolagens com breakdown detalhado | ✅ |
 | Botão flutuante de rolagem, acessível de qualquer aba dentro de uma campanha | ✅ |
+| Rolagem privada / dano oculto | ✅ |
+| Sino de notificações — selo global de eventos novos em todas as campanhas | ✅ |
+| Pop-up ao vivo (5s) para rolagem pública, nova nota, nova sessão e novo membro | ✅ |
 | Área da campanha por abas (Visão geral / Membros / Sessões / Ficha / Configurações) | ✅ |
 | Sessões da campanha — criar, editar e excluir pelo mestre | ✅ |
 | Sessões — visualização com título, data e resumo para jogadores | ✅ |
@@ -228,10 +232,8 @@ O sistema de uma campanha é escolhido no momento da criação e **não pode ser
 ## O que está fora do MVP (futuras features)
 
 - Chat em tempo real
-- Notificações
 - Ficha Altherium completa
 - Explorar campanhas públicas
-- Rolagem privada / dano oculto
 - Configurações de conta
 - Plano premium / monetização
 
@@ -295,6 +297,34 @@ fórmula personalizada.
 - Rolagens privadas não geram registro na aba Atividade — nem pra quem
   rolou, nem pro mestre. Ficam visíveis só pelo próprio popover (notificação
   e histórico recente), marcadas com 🔒.
+
+## Notificações
+
+Um sino fica sempre visível no canto inferior direito, junto do botão de
+rolagem de dados — dentro ou fora do contexto de campanha. Conta eventos
+novos em **todas** as campanhas do usuário, não só a que está aberta.
+
+Eventos que contam: entrada/saída de membro, sessão criada/editada/
+cancelada, nova nota, e rolagem de dados (pública conta pra toda a mesa;
+oculta conta só pro mestre — mesma regra de visibilidade da rolagem
+privada). Convites, atualização de campanha e de ficha não notificam,
+continuam só na aba Atividade.
+
+Clicar no sino marca tudo como visto e leva para `/atividade`. Sem
+Realtime — verifica a cada ~75s enquanto o app está aberto.
+
+### Pop-up ao vivo
+
+Além do sino, um pop-up aparece automaticamente por 5 segundos quando
+acontece: rolagem pública nova, nova nota, nova sessão criada, ou você
+ser adicionado a uma campanha. Rolagem oculta nunca vira pop-up (só conta
+no sino, mesmo pro mestre) — fica discreta de propósito.
+
+Checa a cada 60s, também sem Realtime. O relógio desse pop-up é separado
+do sino e só existe na memória do navegador — recarregar a página zera e
+passa a valer só dali pra frente, pra não disparar uma enxurrada de
+pop-ups de coisa antiga a cada F5. Vários eventos no mesmo intervalo
+aparecem um de cada vez, nunca empilhados.
 
 ---
 
@@ -374,7 +404,7 @@ src/
 │   ├── dice/               # DiceRollerProvider, DiceFab, DiceRollerPanel + diceService
 │   ├── notes/              # CampaignNotesPanel + noteService
 │   ├── sessions/           # CampaignSessionsPanel + sessionService
-│   ├── activity/           # CampaignActivityPanel, GlobalActivityPage + activityService
+│   ├── activity/           # CampaignActivityPanel, GlobalActivityPage, NotificationBell + activityService
 │   └── users/              # profileService
 │
 └── shared/

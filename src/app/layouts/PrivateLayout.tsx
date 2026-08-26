@@ -4,6 +4,8 @@ import { ThemeToggle } from '../../shared/components/ThemeToggle'
 import { AppLogo }     from '../../shared/components/AppLogo'
 import { DiceRollerProvider } from '../../features/dice/DiceRollerProvider'
 import { DiceFab }            from '../../features/dice/components/DiceFab'
+import { NotificationBell }   from '../../features/activity/components/NotificationBell'
+import { NotificationPopup }  from '../../features/activity/components/NotificationPopup'
 import './PrivateLayout.css'
 
 export function PrivateLayout() {
@@ -121,7 +123,11 @@ export function PrivateLayout() {
         <Outlet />
       </main>
     </div>
-    <DiceFab />
+    <div className="dice-fab-wrapper">
+      <NotificationPopup />
+      <NotificationBell />
+      <DiceFab />
+    </div>
     </DiceRollerProvider>
   )
 }

@@ -179,30 +179,28 @@ export function DiceFab() {
 
   if (!campaignId) {
     return (
-      <div className="dice-fab-wrapper">
-        <button
-          type="button"
-          className="dice-fab dice-fab--locked"
-          disabled
-          aria-label="Rolagem de dados indisponível fora de uma campanha"
-          title="Entre em uma campanha para rolar dados"
+      <button
+        type="button"
+        className="dice-fab dice-fab--locked"
+        disabled
+        aria-label="Rolagem de dados indisponível fora de uma campanha"
+        title="Entre em uma campanha para rolar dados"
+      >
+        <svg
+          width="22" height="22" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round"
+          aria-hidden="true"
         >
-          <svg
-            width="22" height="22" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <rect x="5" y="11" width="14" height="10" rx="2" />
-            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-          </svg>
-        </button>
-      </div>
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+      </button>
     )
   }
 
   return (
-    <div className="dice-fab-wrapper">
+    <>
       {(activeRoll || displayRoll !== null) && (
         <div key={toastKey} className="dice-toast" role="status" aria-live="polite">
           <div className="dice-toast__header">
@@ -272,6 +270,6 @@ export function DiceFab() {
       >
         <span key={spinKey} className="dice-fab__icon" aria-hidden="true">⚄</span>
       </button>
-    </div>
+    </>
   )
 }

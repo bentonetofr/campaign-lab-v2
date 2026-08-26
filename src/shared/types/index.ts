@@ -12,6 +12,7 @@ export interface Profile {
   avatar_url: string | null
   main_provider: string | null
   theme_preference: 'dark' | 'light'
+  activity_seen_at: string
   created_at: string
   updated_at: string
 }
