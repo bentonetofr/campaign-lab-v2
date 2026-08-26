@@ -206,7 +206,12 @@ export function DiceFab() {
       {(activeRoll || displayRoll !== null) && (
         <div key={toastKey} className="dice-toast" role="status" aria-live="polite">
           <div className="dice-toast__header">
-            <span className="dice-toast__label">Última rolagem</span>
+            <span className="dice-toast__label">
+              Última rolagem
+              {displayRoll === null && activeRoll?.is_private && (
+                <span title="Rolagem privada" aria-label="Rolagem privada"> 🔒</span>
+              )}
+            </span>
             {displayRoll === null && activeRoll && (
               <span className="dice-toast__formula">{activeRoll.formula ?? activeRoll.die_type}</span>
             )}

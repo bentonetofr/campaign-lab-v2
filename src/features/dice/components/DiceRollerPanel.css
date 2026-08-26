@@ -11,6 +11,59 @@
   max-height: min(420px, calc(100vh - 200px));
 }
 
+/* ── Rolagem privada ── */
+.dice-private-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-label);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  cursor: pointer;
+  align-self: flex-start;
+}
+.dice-private-toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-fast);
+}
+.dice-private-toggle input[type="checkbox"]:hover {
+  border-color: var(--gilded);
+}
+.dice-private-toggle input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--gilded-bright);
+}
+.dice-private-toggle input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--text-inverse);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.dice-private-toggle input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--gilded-bright);
+  outline-offset: 1px;
+}
+.dice-private-toggle__icon {
+  color: var(--accent-dim);
+  flex-shrink: 0;
+}
+
 /* ── Seções ── */
 .dice-section {
   display: flex;
@@ -240,6 +293,12 @@
   text-overflow: ellipsis;
 }
 .dice-history__row--own .dice-history__player { color: var(--text-primary); font-weight: 600; }
+
+.dice-history__private-badge {
+  margin-left: var(--space-1);
+  font-size: var(--text-xs);
+  opacity: 0.8;
+}
 
 .dice-history__formula {
   font-family: var(--font-mono);

@@ -133,6 +133,7 @@ export interface DiceRoll {
   kept_result: number | null
   formula: string | null
   roll_breakdown: RollBreakdownItem[] | null
+  is_private: boolean
   created_at: string
 }
 

@@ -59,6 +59,9 @@ export function DiceRollerPanel({ campaignId, currentUserId, onRoll }: DiceRolle
   const [formulaError, setFormulaError]   = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // ── Rolagem privada — reseta toda vez que o popover reabre, de propósito ──
+  const [isPrivate, setIsPrivate] = useState(false)
+
   // ── Histórico ──
   const [history, setHistory]           = useState<DiceRollWithProfile[]>([])
   const [histLoading, setHistLoading]   = useState(true)
@@ -89,7 +92,7 @@ export function DiceRollerPanel({ campaignId, currentUserId, onRoll }: DiceRolle
     setFormulaError(null)
     setRolling(true)
     try {
-      const roll = await rollDice(campaignId, formula)
+      const roll = await rollDice(campaignId, formula, isPrivate)
       onRoll(roll)
       await loadHistory(true)
     } catch (err) {
@@ -132,6 +135,26 @@ export function DiceRollerPanel({ campaignId, currentUserId, onRoll }: DiceRolle
   // ────────────────────────────────────────────────────
   return (
     <div className="dice-panel__body">
+
+      {/* ── Rolagem privada ── */}
+      <label className="dice-private-toggle">
+        <input
+          type="checkbox"
+          checked={isPrivate}
+          onChange={(e) => setIsPrivate(e.target.checked)}
+        />
+        <svg
+          className="dice-private-toggle__icon"
+          width="14" height="14" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+        Rolagem privada
+      </label>
 
       {/* ── Rolagem rápida ── */}
       <div className="dice-section">
@@ -265,6 +288,9 @@ export function DiceRollerPanel({ campaignId, currentUserId, onRoll }: DiceRolle
                       </span>
                       <span className="dice-history__player">
                         {isOwn ? 'Você' : roll.profile.display_name}
+                        {roll.is_private && (
+                          <span className="dice-history__private-badge" title="Rolagem privada" aria-label="Rolagem privada">🔒</span>
+                        )}
                       </span>
                       <span className="dice-history__formula">
                         {roll.formula ?? roll.die_type}

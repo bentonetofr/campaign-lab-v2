@@ -271,6 +271,7 @@ interface RawRollRow {
   kept_result: number | null
   formula: string | null
   roll_breakdown: RollBreakdownItem[] | null
+  is_private: boolean
   created_at: string
   profiles: { id: string; display_name: string }
 }
@@ -286,6 +287,7 @@ interface RawRollRow {
 export async function rollDice(
   campaignId: string,
   formulaInput: string,
+  isPrivate = false,
 ): Promise<DiceRoll> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Usuário não autenticado.')
@@ -308,13 +310,17 @@ export async function rollDice(
       kept_result:        rolled.legacyKeptResult,
       formula:            rolled.formula,
       roll_breakdown:     rolled.breakdown,
+      is_private:         isPrivate,
     })
     .select('*')
     .single()
 
   if (error) throw new Error('Não foi possível registrar a rolagem.')
   const roll = data as DiceRoll
-  logActivity(campaignId, 'dice_rolled', `Rolagem registrada: ${roll.formula ?? roll.die_type}, resultado ${roll.result}.`)
+  // Rolagem privada não gera rastro na aba Atividade — nem pro autor, nem pro mestre.
+  if (!isPrivate) {
+    logActivity(campaignId, 'dice_rolled', `Rolagem registrada: ${roll.formula ?? roll.die_type}, resultado ${roll.result}.`)
+  }
   return roll
 }
 
@@ -349,6 +355,7 @@ export async function getCampaignRolls(
     kept_result:        row.kept_result         ?? null,
     formula:            row.formula             ?? null,
     roll_breakdown:     (row.roll_breakdown as RollBreakdownItem[] | null) ?? null,
+    is_private:         row.is_private ?? false,
     created_at:         row.created_at,
     profile:            row.profiles,
   }))
