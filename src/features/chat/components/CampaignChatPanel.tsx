@@ -81,6 +81,9 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map())
 
   const listRef = useRef<HTMLDivElement>(null)
@@ -273,11 +276,15 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
   }
 
   async function handleDelete(id: string) {
+    setDeletingId(id)
     try {
       await deleteMessage(id)
       // sem atualização local — o Realtime DELETE remove da lista
     } catch {
       // falha silenciosa — mensagem simplesmente continua visível
+    } finally {
+      setDeletingId(null)
+      setConfirmDeleteId(null)
     }
   }
 
@@ -324,12 +331,34 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
                   </time>
                 </div>
                 <p className="chat-message__content">{m.content}</p>
+
+                {confirmDeleteId === m.id && (
+                  <div className="chat-message__confirm">
+                    <span className="chat-message__confirm-text">Apagar esta mensagem?</span>
+                    <button
+                      type="button"
+                      className="btn btn-danger chat-message__confirm-btn"
+                      onClick={() => handleDelete(m.id)}
+                      disabled={deletingId === m.id}
+                    >
+                      {deletingId === m.id ? <span className="spinner spinner--sm" /> : 'Apagar'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost chat-message__confirm-btn"
+                      onClick={() => setConfirmDeleteId(null)}
+                      disabled={deletingId === m.id}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
               </div>
-              {canDelete && (
+              {canDelete && confirmDeleteId !== m.id && (
                 <button
                   type="button"
                   className="chat-message__delete"
-                  onClick={() => handleDelete(m.id)}
+                  onClick={() => setConfirmDeleteId(m.id)}
                   aria-label="Apagar mensagem"
                   title="Apagar mensagem"
                 >
