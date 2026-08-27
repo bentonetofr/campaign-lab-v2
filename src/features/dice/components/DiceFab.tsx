@@ -12,6 +12,21 @@ const TOAST_DURATION_MS = 4000
 // Máximo de dados desenhados quicando — decorativo, não é 1:1 com fórmulas grandes.
 const MAX_BOUNCING_DICE = 6
 
+const ROLL_SOUND_URL = '/dice-roll.mp3'
+
+function playRollSound() {
+  try {
+    const audio = new Audio(ROLL_SOUND_URL)
+    audio.volume = 0.6
+    void audio.play().catch(() => {
+      // autoplay bloqueado pelo navegador ou outro erro — nunca deve
+      // impedir a rolagem em si, o som é só um extra
+    })
+  } catch {
+    // ambiente sem suporte à Audio API — ignora
+  }
+}
+
 const DIE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅']
 
 function signStr(n: number): string {
@@ -155,6 +170,7 @@ export function DiceFab() {
     if (cycleRef.current !== null)   window.clearInterval(cycleRef.current)
     if (dismissRef.current !== null) window.clearTimeout(dismissRef.current)
 
+    playRollSound()
     setBouncingSides(collectDiceSides(roll))
     cycleRef.current = window.setInterval(() => {
       setDisplayRoll(1 + Math.floor(Math.random() * 20))
