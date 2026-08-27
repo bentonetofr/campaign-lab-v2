@@ -12,6 +12,8 @@ import { CampaignSheetPanel }     from '../../sheets/components/CampaignSheetPan
 import { CampaignSettingsPanel }  from '../components/CampaignSettingsPanel'
 import { CampaignActivityPanel }  from '../../activity/components/CampaignActivityPanel'
 import { CampaignNotesPanel }     from '../../notes/components/CampaignNotesPanel'
+import { CampaignChatPanel }      from '../../chat/components/CampaignChatPanel'
+import { getChatUnreadCount, markChatRead } from '../../chat/services/chatService'
 import type { CampaignWithRole } from '../../../shared/types'
 import './CampaignPages.css'
 
@@ -19,7 +21,7 @@ import './CampaignPages.css'
 // Abas disponíveis — exportado para uso no CampaignOverviewPanel
 // ────────────────────────────────────────────────────────
 
-export type TabId = 'visao-geral' | 'membros' | 'sessoes' | 'ficha' | 'notas' | 'atividade' | 'configuracoes'
+export type TabId = 'visao-geral' | 'membros' | 'sessoes' | 'ficha' | 'notas' | 'atividade' | 'chat' | 'configuracoes'
 
 interface Tab {
   id: TabId
@@ -34,6 +36,7 @@ const TABS: Tab[] = [
   { id: 'ficha',         label: 'Ficha',          icon: '📜' },
   { id: 'notas',         label: 'Notas',          icon: '◇' },
   { id: 'atividade',     label: 'Atividade',      icon: '◉' },
+  { id: 'chat',          label: 'Chat',           icon: '💬' },
   { id: 'configuracoes', label: 'Configurações',  icon: '◈' },
 ]
 
@@ -49,6 +52,7 @@ export function CampaignAreaPage() {
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('visao-geral')
+  const [chatUnread, setChatUnread] = useState(0)
 
   useEffect(() => {
     if (!campaignId || !user) return
@@ -73,6 +77,29 @@ export function CampaignAreaPage() {
     }, 60_000)
     return () => clearInterval(interval)
   }, [campaign?.id])
+
+  // ── Selo de chat não lido — só enquanto a aba de chat não está ativa ──
+  useEffect(() => {
+    if (!campaign?.id || activeTab === 'chat') { setChatUnread(0); return }
+    let cancelled = false
+    async function refresh() {
+      try {
+        const count = await getChatUnreadCount(campaign!.id)
+        if (!cancelled) setChatUnread(count)
+      } catch { /* selo só deixa de atualizar, não quebra a tela */ }
+    }
+    refresh()
+    const interval = setInterval(refresh, 60_000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [campaign?.id, activeTab])
+
+  function handleTabClick(tabId: TabId) {
+    setActiveTab(tabId)
+    if (tabId === 'chat' && campaign?.id) {
+      setChatUnread(0)
+      markChatRead(campaign.id).catch(() => {})
+    }
+  }
 
   if (loading) {
     return (
@@ -147,10 +174,13 @@ export function CampaignAreaPage() {
             aria-selected={activeTab === tab.id}
             aria-controls={`tabpanel-${tab.id}`}
             className={`campaign-tab ${activeTab === tab.id ? 'campaign-tab--active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabClick(tab.id)}
           >
             <span className="campaign-tab__icon" aria-hidden="true">{tab.icon}</span>
             <span className="campaign-tab__label">{tab.label}</span>
+            {tab.id === 'chat' && chatUnread > 0 && (
+              <span className="campaign-tab__badge">{chatUnread > 99 ? '99+' : chatUnread}</span>
+            )}
           </button>
         ))}
       </nav>
@@ -248,6 +278,23 @@ export function CampaignAreaPage() {
         {activeTab === 'atividade' && (
           <CampaignActivityPanel
             campaignId={campaign.id}
+            userRole={campaign.role}
+          />
+        )}
+      </div>
+
+      {/* ── Chat ── */}
+      <div
+        id="tabpanel-chat"
+        role="tabpanel"
+        aria-labelledby="tab-chat"
+        hidden={activeTab !== 'chat'}
+        className="animate-fade-up"
+      >
+        {activeTab === 'chat' && (
+          <CampaignChatPanel
+            campaignId={campaign.id}
+            currentUserId={user!.id}
             userRole={campaign.role}
           />
         )}

@@ -1,0 +1,179 @@
+/* ═══════════════════════════════════════════════════════
+   Chat da campanha — Stitch Medieval Dark v2
+   ═══════════════════════════════════════════════════════ */
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 65vh;
+  min-height: 420px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.chat-panel__list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.chat-panel__state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-family: var(--font-label);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: var(--space-6) 0;
+}
+
+.chat-panel__loading-more {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2) 0;
+}
+
+.chat-panel__empty {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+  margin: auto 0;
+  padding: var(--space-6) 0;
+}
+
+/* ── Mensagem ── */
+.chat-message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 80%;
+}
+.chat-message--own {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.chat-message__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--accent-dim);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.chat-message__avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.chat-message__body {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-4);
+  min-width: 0;
+}
+.chat-message--own .chat-message__body {
+  background: rgba(212, 175, 55, 0.08);
+  border-color: var(--gilded);
+}
+
+.chat-message__meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+.chat-message__name {
+  font-family: var(--font-label);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--accent-dim);
+}
+.chat-message--own .chat-message__name { color: var(--accent-bright); }
+.chat-message__time {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.chat-message__content {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.chat-message__delete {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  padding: var(--space-1);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
+}
+.chat-message:hover .chat-message__delete { opacity: 1; }
+.chat-message__delete:hover { color: var(--danger); }
+
+/* ── Composer ── */
+.chat-panel__composer {
+  border-top: 1px solid var(--border-dim);
+  background: var(--bg-elevated);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.chat-composer__row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.chat-composer__input {
+  flex: 1;
+  resize: none;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  max-height: 120px;
+}
+
+.chat-composer__send {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-6);
+}
+
+/* ── Feedback ── */
+.chat-feedback {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+}
+.chat-feedback--error {
+  background: rgba(255, 180, 171, 0.07);
+  border: 1px solid rgba(255, 180, 171, 0.4);
+  color: #ffb4ab;
+}
+
+@media (max-width: 600px) {
+  .chat-message { max-width: 92%; }
+  .chat-panel { height: 70vh; }
+}

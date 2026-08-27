@@ -101,7 +101,7 @@ Authentication → URL Configuration
 
 As migrations devem ser aplicadas **em ordem**, uma por vez, no **Supabase Dashboard → SQL Editor → New query**.
 
-O repositório contém **30 migrations SQL**. A lista abaixo é o contrato canônico da
+O repositório contém **31 migrations SQL**. A lista abaixo é o contrato canônico da
 ordem de aplicação; não existe uma migration `20240121000000_my_sheets.sql` neste
 repositório e ela não deve ser criada ou aplicada sem uma decisão explícita de
 schema.
@@ -138,6 +138,7 @@ schema.
 | 28 | `20240130000000_dice_keep_lowest.sql` | Adiciona `keep_lowest` (`roll_mode` e validação do `roll_breakdown`) — suporta o operador `@` (manter o menor) na fórmula de rolagem |
 | 29 | `20240131000000_dice_private_rolls.sql` | Adiciona `dice_rolls.is_private` e substitui a policy de SELECT — rolagens privadas só ficam visíveis para quem rolou e para o mestre da campanha |
 | 30 | `20240132000000_notification_seen_at.sql` | Adiciona `profiles.activity_seen_at` — marca quando o usuário viu notificações pela última vez |
+| 31 | `20240133000000_campaign_chat.sql` | Adiciona `campaign_messages` (com Realtime habilitado) e `campaign_chat_reads` + RPC `mark_campaign_chat_read` — chat da campanha em tempo real |
 
 > **Usuários criados antes da migration 1:** o trigger `handle_new_user` cria perfis apenas para novos cadastros. Para sincronizar usuários já existentes, rode o script de backfill comentado na seção 9 da migration 1.
 
@@ -165,7 +166,7 @@ Antes de abrir um deploy ou adicionar uma migration, execute:
 npm run verify
 ```
 
-O comando valida as 30 migrations registradas e depois executa o build de produção.
+O comando valida as 31 migrations registradas e depois executa o build de produção.
 
 ---
 
@@ -215,6 +216,7 @@ O sistema de uma campanha é escolhido no momento da criação e **não pode ser
 | Rolagem privada / dano oculto | ✅ |
 | Sino de notificações — selo global de eventos novos em todas as campanhas | ✅ |
 | Pop-up ao vivo (5s) para rolagem pública, nova nota, nova sessão e novo membro | ✅ |
+| Chat da campanha em tempo real (Realtime), com selo de não lidas na aba | ✅ |
 | Área da campanha por abas (Visão geral / Membros / Sessões / Ficha / Configurações) | ✅ |
 | Sessões da campanha — criar, editar e excluir pelo mestre | ✅ |
 | Sessões — visualização com título, data e resumo para jogadores | ✅ |
@@ -231,7 +233,6 @@ O sistema de uma campanha é escolhido no momento da criação e **não pode ser
 
 ## O que está fora do MVP (futuras features)
 
-- Chat em tempo real
 - Ficha Altherium completa
 - Explorar campanhas públicas
 - Configurações de conta
@@ -329,6 +330,28 @@ aparecem um de cada vez, nunca empilhados.
 
 ---
 
+## Chat da campanha
+
+Aba **"Chat"** dentro de qualquer campanha, entre Atividade e
+Configurações. É a primeira funcionalidade do projeto com **Supabase
+Realtime de verdade** — mensagem aparece pros outros membros na hora, via
+subscription (`postgres_changes`), sem polling.
+
+- Uma conversa por campanha, compartilhada entre todos os membros.
+- Autor apaga a própria mensagem; o mestre pode apagar qualquer mensagem
+  da campanha.
+- Sem edição de mensagem, sem menções, sem anexos.
+- Histórico paginado: carrega as últimas ~30 mensagens ao abrir, e rolar
+  até o topo busca mensagens mais antigas mantendo a posição de leitura.
+- **Selo de não lidas** na própria aba (não no sino global — é por
+  campanha, não cruza para outras campanhas). Some ao abrir a aba.
+
+**Migration necessária:** `20240133000000_campaign_chat.sql` deve estar
+aplicada — ela também habilita a publicação Realtime para
+`campaign_messages` (`alter publication supabase_realtime add table`).
+
+---
+
 ## Sessões de campanha
 
 A aba **"Sessões"** fica acessível dentro de qualquer campanha.
@@ -406,6 +429,7 @@ src/
 │   ├── notes/              # CampaignNotesPanel + noteService
 │   ├── sessions/           # CampaignSessionsPanel + sessionService
 │   ├── activity/           # CampaignActivityPanel, GlobalActivityPage, NotificationBell + activityService
+│   ├── chat/               # CampaignChatPanel + chatService (Realtime)
 │   └── users/              # profileService
 │
 └── shared/

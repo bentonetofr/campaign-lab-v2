@@ -34,6 +34,7 @@ const expectedMigrations = [
   '20240130000000_dice_keep_lowest.sql',
   '20240131000000_dice_private_rolls.sql',
   '20240132000000_notification_seen_at.sql',
+  '20240133000000_campaign_chat.sql',
 ]
 
 const actualMigrations = readdirSync(migrationDirectory)
