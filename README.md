@@ -135,7 +135,7 @@ schema.
 | 25 | `20240127000000_dnd_sheet_details.sql` | Perícias, ataques, inventário e magias da ficha D&D 5e, com índices, triggers e RLS |
 | 26 | `20240128000000_dnd_rules_engine.sql` | Catálogo D&D 5e 2014, escolhas oficiais, proficiências adicionais e sobrescritas manuais de campos calculados |
 | 27 | `20240129000000_dnd_equipment_catalog.sql` | Catálogo estruturado de armas, armaduras, itens de aventura e ferramentas para a ficha D&D 5e |
-| 28 | `20240130000000_dice_keep_lowest.sql` | Adiciona `keep_lowest` (`roll_mode` e validação do `roll_breakdown`) — suporta o operador `~` (manter o menor) na fórmula de rolagem |
+| 28 | `20240130000000_dice_keep_lowest.sql` | Adiciona `keep_lowest` (`roll_mode` e validação do `roll_breakdown`) — suporta o operador `@` (manter o menor) na fórmula de rolagem |
 | 29 | `20240131000000_dice_private_rolls.sql` | Adiciona `dice_rolls.is_private` e substitui a policy de SELECT — rolagens privadas só ficam visíveis para quem rolou e para o mestre da campanha |
 | 30 | `20240132000000_notification_seen_at.sql` | Adiciona `profiles.activity_seen_at` — marca quando o usuário viu notificações pela última vez |
 
@@ -209,7 +209,7 @@ O sistema de uma campanha é escolhido no momento da criação e **não pode ser
 | Barra de HP visual na ficha | ✅ |
 | Mestre vê todas as fichas com status de preenchimento | ✅ |
 | Rolagem rápida de dados (d4–d100) | ✅ |
-| Rolagem personalizada por fórmula (`2d6+3`, `2#d20`, `2~d20`…) | ✅ |
+| Rolagem personalizada por fórmula (`2d6+3`, `2#d20`, `2@d20`…) | ✅ |
 | Histórico de rolagens com breakdown detalhado | ✅ |
 | Botão flutuante de rolagem, acessível de qualquer aba dentro de uma campanha | ✅ |
 | Rolagem privada / dano oculto | ✅ |
@@ -265,12 +265,12 @@ Campo de texto que aceita uma gramática controlada (sem eval, sem funções):
 | `2d6+3` | soma 2d6 e adiciona 3 |
 | `3d4-1` | soma 3d4 e subtrai 1 |
 | `2#d20` | rola 2d20, **mantém o maior resultado** |
-| `2~d20` | rola 2d20, **mantém o menor resultado** |
+| `2@d20` | rola 2d20, **mantém o menor resultado** |
 | `1#d3+4` | rola 1d3, mantém o maior resultado, adiciona 4 |
 | `3#d6+2` | rola 3d6, mantém o maior resultado, adiciona 2 |
 | `2#d20+1d4+3` | keep-highest 2d20 + soma 1d4 + modificador 3 |
 
-O operador `#` significa "rolar N dados e manter o maior resultado"; `~` é o
+O operador `#` significa "rolar N dados e manter o maior resultado"; `@` é o
 complemento — "rolar N dados e manter o menor resultado". O resultado
 detalhado sempre exibe os dados individuais e qual foi mantido.
 
@@ -279,7 +279,7 @@ detalhado sempre exibe os dados individuais e qual foi mantido.
 ### Histórico
 
 - Últimas 3 rolagens da campanha, direto no popover do botão flutuante
-- Exibe fórmula, resultados individuais, kept result (quando `#` ou `~`), modificador e resultado final
+- Exibe fórmula, resultados individuais, kept result (quando `#` ou `@`), modificador e resultado final
 - Botão **"Atualizar"** recarrega manualmente (sem Realtime / sem polling)
 - Histórico completo além das últimas 3 fica registrado na aba **Atividade** da campanha
 

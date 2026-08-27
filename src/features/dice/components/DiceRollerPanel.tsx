@@ -47,7 +47,7 @@ function signStr(n: number): string {
 // Componente principal
 // ────────────────────────────────────────────────────────
 
-const EXAMPLE_FORMULAS = ['2d6+3', '2#d20', '2~d20', '1#d3+4']
+const EXAMPLE_FORMULAS = ['2d6+3', '2#d20', '2@d20', '1#d3+4']
 
 export function DiceRollerPanel({ campaignId, currentUserId, onRoll }: DiceRollerPanelProps) {
   // ── Rolagem ──

@@ -11,6 +11,21 @@ const POPUP_DURATION_MS = 5_000
 // Duração da animação de saída — soma dentro do tempo total acima.
 const POPUP_EXIT_MS = 320
 
+const NOTIFY_SOUND_URL = '/notify.mp3'
+
+function playNotifySound() {
+  try {
+    const audio = new Audio(NOTIFY_SOUND_URL)
+    audio.volume = 0.6
+    void audio.play().catch(() => {
+      // autoplay bloqueado pelo navegador ou outro erro — nunca deve
+      // impedir o pop-up de aparecer, o som é só um extra
+    })
+  } catch {
+    // ambiente sem suporte à Audio API — ignora
+  }
+}
+
 export function NotificationPopup() {
   const { user } = useAuth()
   const [queue, setQueue]     = useState<LiveNotification[]>([])
@@ -52,6 +67,7 @@ export function NotificationPopup() {
   useEffect(() => {
     if (current || queue.length === 0) return
     const [next, ...rest] = queue
+    playNotifySound()
     setCurrent(next)
     setLeaving(false)
     setQueue(rest)
