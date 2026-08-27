@@ -318,9 +318,12 @@ verifica a cada ~75s enquanto o app está aberto.
 ### Pop-up ao vivo
 
 Além do sino, um pop-up aparece automaticamente por 5 segundos quando
-acontece: rolagem pública nova, nova nota, nova sessão criada, ou você
-ser adicionado a uma campanha. Rolagem oculta nunca vira pop-up (só conta
-no sino, mesmo pro mestre) — fica discreta de propósito.
+acontece: rolagem pública nova, nova nota, nova sessão criada, nova
+mensagem de chat (com prévia do conteúdo), ou você ser adicionado a uma
+campanha. Rolagem oculta nunca vira pop-up (só conta no sino, mesmo pro
+mestre) — fica discreta de propósito. Mensagem de chat vira pop-up mas
+**não** conta no selo do sino global — o "não lido" de chat mora só na
+própria aba (ver seção "Chat da campanha").
 
 Checa a cada 60s, também sem Realtime. O relógio desse pop-up é separado
 do sino e só existe na memória do navegador — recarregar a página zera e

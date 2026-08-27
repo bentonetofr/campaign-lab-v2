@@ -285,6 +285,9 @@ const POPUP_ACTIVITY_TYPES: ActivityType[] = ['note_created', 'session_created']
 type ActivityRow = { id: string; message: string; created_at: string; campaigns: { name: string } | null }
 type DiceRow = { id: string; formula: string | null; die_type: string; result: number; created_at: string; campaigns: { name: string } | null; profiles: { display_name: string } | null }
 type MemberRow = { id: string; created_at: string; campaigns: { name: string } | null }
+type MessageRow = { id: string; content: string; created_at: string; campaigns: { name: string } | null; profiles: { display_name: string } | null }
+
+const MESSAGE_PREVIEW_LENGTH = 80
 
 function mapActivityRow(row: ActivityRow): LiveNotification {
   return {
@@ -313,6 +316,18 @@ function mapMemberRow(row: MemberRow): LiveNotification {
   }
 }
 
+function mapMessageRow(row: MessageRow): LiveNotification {
+  const preview = row.content.length > MESSAGE_PREVIEW_LENGTH
+    ? row.content.slice(0, MESSAGE_PREVIEW_LENGTH) + '…'
+    : row.content
+  return {
+    id:           `message-${row.id}`,
+    message:      `${row.profiles?.display_name ?? 'Alguém'}: ${preview}`,
+    campaignName: row.campaigns?.name ?? 'Campanha',
+    createdAt:    row.created_at,
+  }
+}
+
 /**
  * Busca os últimos `limit` eventos de cada fonte pro mecanismo de pop-up.
  * Não filtra por data — quem chama decide o que já foi mostrado (por id),
@@ -320,13 +335,16 @@ function mapMemberRow(row: MemberRow): LiveNotification {
  * Diferente do selo, rolagem oculta nunca aparece aqui (nem pro mestre) —
  * só rolagem pública. "Fui adicionado a uma campanha" não dá pra pegar de
  * forma confiável pelo actor_id de campaign_activity (varia se foi convite
- * por e-mail ou link), então lê direto de campaign_members.
+ * por e-mail ou link), então lê direto de campaign_members. Mensagem de
+ * chat também vira pop-up (com prévia do conteúdo) — mas, diferente dos
+ * outros tipos, não conta no selo do sino global, só no selo da própria
+ * aba de chat.
  */
 export async function getLiveNotifications(limit = 8): Promise<LiveNotification[]> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  const [activityRes, diceRes, memberRes] = await Promise.all([
+  const [activityRes, diceRes, memberRes, messageRes] = await Promise.all([
     supabase
       .from('campaign_activity')
       .select('id, message, created_at, campaigns(name)')
@@ -347,16 +365,24 @@ export async function getLiveNotifications(limit = 8): Promise<LiveNotification[
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(limit),
+    supabase
+      .from('campaign_messages')
+      .select('id, content, created_at, campaigns(name), profiles(display_name)')
+      .neq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit),
   ])
 
   if (activityRes.error) console.error('[getLiveNotifications] erro em campaign_activity:', activityRes.error)
   if (diceRes.error)     console.error('[getLiveNotifications] erro em dice_rolls:', diceRes.error)
   if (memberRes.error)   console.error('[getLiveNotifications] erro em campaign_members:', memberRes.error)
+  if (messageRes.error)  console.error('[getLiveNotifications] erro em campaign_messages:', messageRes.error)
 
   const events: LiveNotification[] = [
     ...((activityRes.data ?? []) as unknown as ActivityRow[]).map(mapActivityRow),
     ...((diceRes.data ?? []) as unknown as DiceRow[]).map(mapDiceRow),
     ...((memberRes.data ?? []) as unknown as MemberRow[]).map(mapMemberRow),
+    ...((messageRes.data ?? []) as unknown as MessageRow[]).map(mapMessageRow),
   ]
 
   // mais antigo primeiro, pra fila do pop-up mostrar em ordem cronológica
