@@ -166,7 +166,6 @@ export function CampaignAreaPage() {
         {activeTab === 'visao-geral' && (
           <CampaignOverviewPanel
             campaign={campaign}
-            currentUserId={user!.id}
             onNavigate={setActiveTab}
           />
         )}

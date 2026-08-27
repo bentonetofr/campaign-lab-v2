@@ -4,7 +4,6 @@ import {
   getMySheet,
   isSheetFilled,
 } from '../../sheets/services/sheetService'
-import { getCampaignRolls } from '../../dice/services/diceService'
 import { getCampaignSessions } from '../../sessions/services/sessionService'
 import { getCampaignPresence, isUserOnline } from '../../activity/services/activityService'
 import { getCampaignNotesSummary } from '../../notes/services/noteService'
@@ -12,7 +11,6 @@ import type {
   CampaignMemberWithProfile,
   CampaignSession,
   CharacterSheet,
-  DiceRollWithProfile,
 } from '../../../shared/types'
 
 // ────────────────────────────────────────────────────────
@@ -21,7 +19,6 @@ import type {
 
 export interface OverviewMasterData {
   members:            CampaignMemberWithProfile[]
-  recentRolls:        DiceRollWithProfile[]
   sheetsFilled:       number
   sheetsTotal:        number
   sessionsTotal:      number
@@ -35,7 +32,6 @@ export interface OverviewMasterData {
 
 export interface OverviewPlayerData {
   members:            CampaignMemberWithProfile[]
-  recentRolls:        DiceRollWithProfile[]
   mySheet:            CharacterSheet | null
   sessionsTotal:      number
   sessionsPlanned:    number
@@ -77,9 +73,8 @@ function findNextPlannedSession(sessions: CampaignSession[]): CampaignSession | 
 export async function getMasterOverview(
   campaignId: string
 ): Promise<OverviewMasterData> {
-  const [members, recentRolls, allSheets, sessions, presence, notesSummary] = await Promise.all([
+  const [members, allSheets, sessions, presence, notesSummary] = await Promise.all([
     getCampaignMembers(campaignId),
-    getCampaignRolls(campaignId, 3),
     getCampaignSheets(campaignId),
     getCampaignSessions(campaignId),
     getCampaignPresence(campaignId),
@@ -91,7 +86,6 @@ export async function getMasterOverview(
 
   return {
     members,
-    recentRolls,
     sheetsFilled,
     sheetsTotal:        allSheets.length,
     sessionsTotal:      sessions.length,
@@ -111,9 +105,8 @@ export async function getMasterOverview(
 export async function getPlayerOverview(
   campaignId: string
 ): Promise<OverviewPlayerData> {
-  const [members, recentRolls, mySheet, sessions, presence, notesSummary] = await Promise.all([
+  const [members, mySheet, sessions, presence, notesSummary] = await Promise.all([
     getCampaignMembers(campaignId),
-    getCampaignRolls(campaignId, 3),
     getMySheet(campaignId),
     getCampaignSessions(campaignId),
     getCampaignPresence(campaignId),
@@ -124,7 +117,6 @@ export async function getPlayerOverview(
 
   return {
     members,
-    recentRolls,
     mySheet,
     sessionsTotal:      sessions.length,
     sessionsPlanned:    sessions.filter((s) => s.status === 'planned').length,

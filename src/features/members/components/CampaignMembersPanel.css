@@ -39,6 +39,14 @@
   color: #6ec99a;
 }
 
+/* ── Grid responsiva: convite + presença lado a lado ── */
+.members-top-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+
 /* ── Blocos (convite / adicionar jogador) ── */
 .members-block {
   background: var(--bg-surface);
@@ -114,6 +122,71 @@
 .members-block__action-btn {
   align-self: flex-start;
   font-size: var(--text-sm);
+}
+
+/* ── Card de membros online ── */
+.members-presence__badge {
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: #6ec99a;
+  background: rgba(77, 158, 120, 0.12);
+  padding: 1px 8px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.members-presence-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.members-presence-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-dim);
+}
+.members-presence-item:last-child { border-bottom: none; }
+
+.members-presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.members-presence-dot--online {
+  background: #6ec99a;
+  box-shadow: 0 0 6px rgba(77, 158, 120, 0.6);
+}
+.members-presence-dot--offline {
+  background: var(--text-muted);
+  opacity: 0.5;
+}
+
+.members-presence-item__name {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.members-presence-item__role {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.members-presence-item__time {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 /* ── Badge de status do convite ── */

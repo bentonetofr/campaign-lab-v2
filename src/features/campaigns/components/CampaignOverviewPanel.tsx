@@ -6,7 +6,6 @@ import {
   type OverviewPlayerData,
 } from '../services/campaignOverviewService'
 import { isSheetFilled } from '../../sheets/services/sheetService'
-import { useDiceRoller } from '../../dice/DiceRollerProvider'
 import type { CampaignWithRole } from '../../../shared/types'
 import type { TabId } from '../pages/CampaignAreaPage'
 import './CampaignOverviewPanel.css'
@@ -16,9 +15,8 @@ import './CampaignOverviewPanel.css'
 // ────────────────────────────────────────────────────────
 
 interface CampaignOverviewPanelProps {
-  campaign:      CampaignWithRole
-  currentUserId: string
-  onNavigate:    (tab: TabId) => void
+  campaign:   CampaignWithRole
+  onNavigate: (tab: TabId) => void
 }
 
 // ────────────────────────────────────────────────────────
@@ -118,60 +116,11 @@ function OverviewNotesCard({ notesTotal, latestNote, onNavigate }: OverviewNotes
 }
 
 // ────────────────────────────────────────────────────────
-// RecentRollsCard
-// ────────────────────────────────────────────────────────
-
-interface RecentRollsCardProps {
-  rolls:         OverviewMasterData['recentRolls']
-  currentUserId: string
-}
-
-function RecentRollsCard({ rolls, currentUserId }: RecentRollsCardProps) {
-  const { open: openDiceRoller } = useDiceRoller()
-
-  return (
-    <div className="ov-rolls-card">
-      <div className="ov-rolls-card__header">
-        <span className="ov-rolls-card__icon" aria-hidden="true">⬡</span>
-        <span className="ov-rolls-card__title">Rolagens recentes</span>
-        <button
-          className="btn btn-ghost ov-rolls-card__link"
-          onClick={openDiceRoller}
-        >
-          Rolar dados →
-        </button>
-      </div>
-
-      {rolls.length > 0 ? (
-        <ul className="ov-rolls-list">
-          {rolls.map((r) => (
-            <li
-              key={r.id}
-              className={`ov-roll${r.user_id === currentUserId ? ' ov-roll--own' : ''}`}
-            >
-              <span className="ov-roll__formula">{r.formula ?? r.die_type}</span>
-              <span className="ov-roll__meta">
-                {r.user_id === currentUserId ? 'Você' : r.profile.display_name}
-                {' · '}{formatRelativeTime(r.created_at)}
-              </span>
-              <span className="ov-roll__result">{r.result}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="ov-rolls-card__empty">Nenhuma rolagem registrada ainda.</p>
-      )}
-    </div>
-  )
-}
-
-// ────────────────────────────────────────────────────────
 // Componente principal
 // ────────────────────────────────────────────────────────
 
 export function CampaignOverviewPanel({
   campaign,
-  currentUserId,
   onNavigate,
 }: CampaignOverviewPanelProps) {
   const isMaster = campaign.role === 'master'
@@ -196,12 +145,10 @@ export function CampaignOverviewPanel({
       {isMaster
         ? <MasterDashboard
             campaignId={campaign.id}
-            currentUserId={currentUserId}
             onNavigate={onNavigate}
           />
         : <PlayerDashboard
             campaignId={campaign.id}
-            currentUserId={currentUserId}
             onNavigate={onNavigate}
           />
       }
@@ -215,12 +162,10 @@ export function CampaignOverviewPanel({
 
 function MasterDashboard({
   campaignId,
-  currentUserId,
   onNavigate,
 }: {
-  campaignId:    string
-  currentUserId: string
-  onNavigate:    (tab: TabId) => void
+  campaignId: string
+  onNavigate: (tab: TabId) => void
 }) {
   const [data,    setData]    = useState<OverviewMasterData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -324,12 +269,6 @@ function MasterDashboard({
         onNavigate={onNavigate}
       />
 
-      {/* ── Linha 3: rolagens ── */}
-      <RecentRollsCard
-        rolls={data.recentRolls}
-        currentUserId={currentUserId}
-      />
-
     </div>
   )
 }
@@ -340,12 +279,10 @@ function MasterDashboard({
 
 function PlayerDashboard({
   campaignId,
-  currentUserId,
   onNavigate,
 }: {
-  campaignId:    string
-  currentUserId: string
-  onNavigate:    (tab: TabId) => void
+  campaignId: string
+  onNavigate: (tab: TabId) => void
 }) {
   const [data,    setData]    = useState<OverviewPlayerData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -448,12 +385,6 @@ function PlayerDashboard({
         notesTotal={data.notesTotal}
         latestNote={data.latestNote}
         onNavigate={onNavigate}
-      />
-
-      {/* ── Linha 3: rolagens ── */}
-      <RecentRollsCard
-        rolls={data.recentRolls}
-        currentUserId={currentUserId}
       />
 
     </div>

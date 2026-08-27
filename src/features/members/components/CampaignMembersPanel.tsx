@@ -14,9 +14,16 @@ import {
   deactivateCampaignInvite,
   getActiveCampaignInvite,
 } from '../../invites/services/inviteService'
+import { getCampaignPresence, isUserOnline, formatPresenceTime } from '../../activity/services/activityService'
 import type { CampaignMemberWithProfile } from '../../../shared/types'
 import { formatRole } from '../../../shared/utils/campaign'
 import './CampaignMembersPanel.css'
+
+interface MemberPresence {
+  member:     CampaignMemberWithProfile
+  lastSeenAt: string | undefined
+  online:     boolean
+}
 
 // ────────────────────────────────────────────────────────
 // Props
@@ -207,6 +214,90 @@ function MemberSection({
             )
           })}
         </div>
+      )}
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────
+// Card de membros online
+// ────────────────────────────────────────────────────────
+
+function MembersPresenceCard({ campaignId }: { campaignId: string }) {
+  const [presenceList, setPresenceList] = useState<MemberPresence[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      try {
+        const [members, presence] = await Promise.all([
+          getCampaignMembers(campaignId),
+          getCampaignPresence(campaignId),
+        ])
+        const presenceMap = new Map(presence.map((p) => [p.user_id, p.last_seen_at]))
+        const merged: MemberPresence[] = members.map((m) => {
+          const lastSeenAt = presenceMap.get(m.user_id)
+          return { member: m, lastSeenAt, online: isUserOnline(lastSeenAt) }
+        })
+        merged.sort((a, b) => (a.online === b.online ? 0 : a.online ? -1 : 1))
+        if (!cancelled) setPresenceList(merged)
+      } catch {
+        // card secundário — falha aqui não deve travar a aba de membros
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [campaignId])
+
+  const onlineCount = presenceList.filter((p) => p.online).length
+
+  return (
+    <div className="members-block">
+      <div className="members-block__header">
+        <span className="members-block__icon" aria-hidden="true">◉</span>
+        <div className="members-block__header-text">
+          <h4 className="members-block__title">
+            Membros online
+            {onlineCount > 0 && (
+              <span className="members-presence__badge">{onlineCount}</span>
+            )}
+          </h4>
+          <p className="members-block__desc">Quem está na campanha agora.</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="members-block__loading">
+          <div className="spinner spinner--sm" />
+          <span>Carregando...</span>
+        </div>
+      ) : presenceList.length > 0 ? (
+        <ul className="members-presence-list" role="list">
+          {presenceList.map(({ member, lastSeenAt, online }) => (
+            <li key={member.user_id} className="members-presence-item">
+              <span
+                className={`members-presence-dot ${online ? 'members-presence-dot--online' : 'members-presence-dot--offline'}`}
+                aria-label={online ? 'online' : 'offline'}
+              />
+              <span className="members-presence-item__name">
+                {member.profile.display_name}
+                {member.role === 'master' && (
+                  <span className="members-presence-item__role"> (mestre)</span>
+                )}
+              </span>
+              {!online && (
+                <span className="members-presence-item__time">{formatPresenceTime(lastSeenAt)}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="members-block__desc">Sem membros.</p>
       )}
     </div>
   )
@@ -486,8 +577,17 @@ export function CampaignMembersPanel({
   return (
     <div className="members-panel">
 
+      {/* ── Convite + presença lado a lado ── */}
+      {isMaster ? (
+        <div className="members-top-grid">
+          <InviteCard campaignId={campaignId} />
+          <MembersPresenceCard campaignId={campaignId} />
+        </div>
+      ) : (
+        <MembersPresenceCard campaignId={campaignId} />
+      )}
+
       {/* ── Ações do mestre ── */}
-      {isMaster && <InviteCard campaignId={campaignId} />}
       {isMaster && <AddPlayerForm campaignId={campaignId} onAdded={loadMembers} />}
 
       {/* ── Lista de membros ── */}
