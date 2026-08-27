@@ -26,18 +26,17 @@ export type TabId = 'visao-geral' | 'membros' | 'sessoes' | 'ficha' | 'notas' | 
 interface Tab {
   id: TabId
   label: string
-  icon: string
 }
 
 const TABS: Tab[] = [
-  { id: 'visao-geral',   label: 'Visão geral',   icon: '◎' },
-  { id: 'membros',       label: 'Membros',        icon: '⚔' },
-  { id: 'sessoes',       label: 'Sessões',        icon: '✦' },
-  { id: 'ficha',         label: 'Ficha',          icon: '📜' },
-  { id: 'notas',         label: 'Notas',          icon: '◇' },
-  { id: 'atividade',     label: 'Atividade',      icon: '◉' },
-  { id: 'chat',          label: 'Chat',           icon: '💬' },
-  { id: 'configuracoes', label: 'Configurações',  icon: '◈' },
+  { id: 'visao-geral',   label: 'Visão geral' },
+  { id: 'membros',       label: 'Membros' },
+  { id: 'sessoes',       label: 'Sessões' },
+  { id: 'ficha',         label: 'Ficha' },
+  { id: 'notas',         label: 'Notas' },
+  { id: 'atividade',     label: 'Atividade' },
+  { id: 'chat',          label: 'Chat' },
+  { id: 'configuracoes', label: 'Configurações' },
 ]
 
 // ────────────────────────────────────────────────────────
@@ -176,7 +175,6 @@ export function CampaignAreaPage() {
             className={`campaign-tab ${activeTab === tab.id ? 'campaign-tab--active' : ''}`}
             onClick={() => handleTabClick(tab.id)}
           >
-            <span className="campaign-tab__icon" aria-hidden="true">{tab.icon}</span>
             <span className="campaign-tab__label">{tab.label}</span>
             {tab.id === 'chat' && chatUnread > 0 && (
               <span className="campaign-tab__badge">{chatUnread > 99 ? '99+' : chatUnread}</span>

@@ -9,6 +9,7 @@ import {
   type TypingPayload,
 } from '../services/chatService'
 import { getCampaignMembers } from '../../members/services/memberService'
+import { useActiveChat } from '../ActiveChatContext'
 import './CampaignChatPanel.css'
 
 // ────────────────────────────────────────────────────────
@@ -74,6 +75,17 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
   const sendTypingRef = useRef<((payload: TypingPayload) => void) | null>(null)
   const lastTypingSentAtRef = useRef(0)
   const typingTimeoutsRef = useRef<Map<string, number>>(new Map())
+
+  const { setActiveChatCampaignId } = useActiveChat()
+
+  // Avisa globalmente "estou vendo o chat desta campanha" — o pop-up de
+  // notificação usa isso pra não interromper com uma mensagem que o
+  // usuário já está vendo chegar ao vivo aqui. Limpa ao desmontar (troca
+  // de aba já desmonta este painel, então isso cobre "saiu do chat").
+  useEffect(() => {
+    setActiveChatCampaignId(campaignId)
+    return () => setActiveChatCampaignId(null)
+  }, [campaignId, setActiveChatCampaignId])
 
   const scrollToBottom = useCallback(() => {
     const el = listRef.current

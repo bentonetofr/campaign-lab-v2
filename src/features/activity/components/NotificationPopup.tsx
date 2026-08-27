@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
+import { useActiveChat } from '../../chat/ActiveChatContext'
 import {
   getLiveNotifications,
   getMessageNotification,
@@ -33,9 +34,16 @@ function playNotifySound() {
 
 export function NotificationPopup() {
   const { user } = useAuth()
+  const { activeChatCampaignId } = useActiveChat()
   const [queue, setQueue]     = useState<LiveNotification[]>([])
   const [current, setCurrent] = useState<LiveNotification | null>(null)
   const [leaving, setLeaving] = useState(false)
+
+  // Ref porque a assinatura Realtime abaixo é montada uma vez só — não
+  // queremos recriar o canal toda vez que o usuário troca de aba/campanha,
+  // só ler o valor mais atual no momento em que um evento chega.
+  const activeChatCampaignIdRef = useRef(activeChatCampaignId)
+  useEffect(() => { activeChatCampaignIdRef.current = activeChatCampaignId }, [activeChatCampaignId])
 
   // IDs já mostrados — só em memória. null = ainda não fez a primeira
   // checagem. Na primeira checagem só registra o que já existe, sem
@@ -73,7 +81,10 @@ export function NotificationPopup() {
   useEffect(() => {
     if (!user) return
 
-    const unsubscribe = subscribeToNewMessagesGlobally(user.id, async (messageId) => {
+    const unsubscribe = subscribeToNewMessagesGlobally(user.id, async (messageId, campaignId) => {
+      // usuário já está vendo esse chat ao vivo — não interrompe com pop-up
+      if (campaignId === activeChatCampaignIdRef.current) return
+
       const id = `message-${messageId}`
       if (!seenIdsRef.current) seenIdsRef.current = new Set()
       if (seenIdsRef.current.has(id)) return

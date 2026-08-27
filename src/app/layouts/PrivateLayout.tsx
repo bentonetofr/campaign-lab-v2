@@ -6,6 +6,7 @@ import { DiceRollerProvider } from '../../features/dice/DiceRollerProvider'
 import { DiceFab }            from '../../features/dice/components/DiceFab'
 import { NotificationBell }   from '../../features/activity/components/NotificationBell'
 import { NotificationPopup }  from '../../features/activity/components/NotificationPopup'
+import { ActiveChatProvider }  from '../../features/chat/ActiveChatContext'
 import './PrivateLayout.css'
 
 export function PrivateLayout() {
@@ -25,6 +26,7 @@ export function PrivateLayout() {
   }
 
   return (
+    <ActiveChatProvider>
     <DiceRollerProvider>
     <div className="private-layout">
       {/* ── Sidebar (desktop) ── */}
@@ -129,5 +131,6 @@ export function PrivateLayout() {
       <DiceFab />
     </div>
     </DiceRollerProvider>
+    </ActiveChatProvider>
   )
 }

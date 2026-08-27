@@ -391,11 +391,13 @@ export async function getLiveNotifications(limit = 8): Promise<LiveNotification[
  * teria permissão de SELECT de qualquer forma (ou seja, campanhas onde
  * ele é membro). Usado só pra notificar mensagem nova na hora — a
  * conversa em si (`CampaignChatPanel`) assina o canal por campanha, à
- * parte. Ignora a própria mensagem do usuário (`currentUserId`).
+ * parte. Ignora a própria mensagem do usuário (`currentUserId`). Passa o
+ * `campaignId` junto pro chamador decidir se suprime (ex: usuário já
+ * está vendo aquele chat).
  */
 export function subscribeToNewMessagesGlobally(
   currentUserId: string,
-  onMessage: (messageId: string) => void,
+  onMessage: (messageId: string, campaignId: string) => void,
 ): () => void {
   const channel = supabase
     .channel('global-chat-notifications')
@@ -403,9 +405,9 @@ export function subscribeToNewMessagesGlobally(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'campaign_messages' },
       (payload) => {
-        const row = payload.new as { id: string; user_id: string }
+        const row = payload.new as { id: string; user_id: string; campaign_id: string }
         if (row.user_id === currentUserId) return
-        onMessage(row.id)
+        onMessage(row.id, row.campaign_id)
       },
     )
     .subscribe()
@@ -432,13 +434,15 @@ export async function getMessageNotification(messageId: string): Promise<LiveNot
 /**
  * Busca as últimas notificações (independente de "visto"), pro painel do
  * sino. Usa o mesmo conjunto de tipos que conta pro selo — mais amplo que
- * o do pop-up ao vivo (inclui membro saiu/removido, sessão editada/cancelada).
+ * o do pop-up ao vivo (inclui membro saiu/removido, sessão editada/cancelada)
+ * — mais mensagens de chat, que aparecem aqui só como histórico (não
+ * contam pro selo/contagem — esse continua vivendo só na aba de chat).
  */
 export async function getRecentNotifications(limit = 3): Promise<LiveNotification[]> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  const [activityRes, diceRes] = await Promise.all([
+  const [activityRes, diceRes, messageRes] = await Promise.all([
     supabase
       .from('campaign_activity')
       .select('id, message, created_at, campaigns(name)')
@@ -452,11 +456,18 @@ export async function getRecentNotifications(limit = 3): Promise<LiveNotificatio
       .neq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(limit),
+    supabase
+      .from('campaign_messages')
+      .select('id, content, created_at, campaigns(name), profiles(display_name)')
+      .neq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit),
   ])
 
   const events: LiveNotification[] = [
     ...((activityRes.data ?? []) as unknown as ActivityRow[]).map(mapActivityRow),
     ...((diceRes.data ?? []) as unknown as DiceRow[]).map(mapDiceRow),
+    ...((messageRes.data ?? []) as unknown as MessageRow[]).map(mapMessageRow),
   ]
 
   events.sort((a, b) => b.createdAt.localeCompare(a.createdAt))

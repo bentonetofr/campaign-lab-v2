@@ -311,7 +311,9 @@ oculta conta só pro mestre — mesma regra de visibilidade da rolagem
 privada). Convites, atualização de campanha e de ficha não notificam,
 continuam só na aba Atividade.
 
-Clicar no sino abre um painel com as últimas 3 notificações (mesmo estilo
+O painel do sino também lista mensagens de chat recentes (só como
+histórico — continuam fora da contagem do selo). Clicar no sino abre um
+painel com as últimas 3 notificações (mesmo estilo
 do popover de rolagem de dados) e marca tudo como visto. Sem Realtime —
 verifica a cada ~75s enquanto o app está aberto.
 
@@ -334,6 +336,10 @@ memória do navegador — recarregar a página zera e passa a valer só dali
 pra frente, pra não disparar uma enxurrada de pop-ups de coisa antiga a
 cada F5. Vários eventos no mesmo intervalo aparecem um de cada vez, nunca
 empilhados.
+
+Mensagem de chat **não** vira pop-up se o usuário já estiver dentro
+daquela conversa (aba Chat da mesma campanha aberta) — um contexto leve
+(`ActiveChatProvider`) avisa globalmente qual chat está em tela.
 
 ---
 
