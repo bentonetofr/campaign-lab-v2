@@ -348,6 +348,8 @@ subscription (`postgres_changes`), sem polling.
   até o topo busca mensagens mais antigas mantendo a posição de leitura.
 - **Selo de não lidas** na própria aba (não no sino global — é por
   campanha, não cruza para outras campanhas). Some ao abrir a aba.
+- **Indicador de "digitando..."** — via Realtime Broadcast (efêmero, não
+  grava no banco), some sozinho se parar de chegar aviso por ~3,5s.
 
 **Migration necessária:** `20240133000000_campaign_chat.sql` deve estar
 aplicada — ela também habilita a publicação Realtime para

@@ -6,6 +6,7 @@ import {
   subscribeToMessages,
   markChatRead,
   type ChatMessage,
+  type TypingPayload,
 } from '../services/chatService'
 import { getCampaignMembers } from '../../members/services/memberService'
 import './CampaignChatPanel.css'
@@ -23,6 +24,18 @@ interface CampaignChatPanelProps {
 const PAGE_SIZE = 30
 const NEAR_BOTTOM_PX = 100
 const NEAR_TOP_PX = 60
+// Intervalo mínimo entre broadcasts de "digitando" enquanto o usuário
+// escreve — evita mandar um evento por tecla.
+const TYPING_BROADCAST_THROTTLE_MS = 2000
+// Se não chegar outro aviso de "digitando" desse usuário nesse tempo, o
+// indicador some sozinho — protege contra aba fechada/travada no meio.
+const TYPING_EXPIRE_MS = 3500
+
+function formatTypingUsers(names: string[]): string {
+  if (names.length === 1) return `${names[0]} está digitando`
+  if (names.length === 2) return `${names[0]} e ${names[1]} estão digitando`
+  return `${names[0]} e mais ${names.length - 1} estão digitando`
+}
 
 // ────────────────────────────────────────────────────────
 // Utilitários
@@ -52,9 +65,15 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
 
+  const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map())
+
   const listRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isNearBottomRef = useRef(true)
   const memberProfilesRef = useRef<Map<string, ChatMessage['profile']>>(new Map())
+  const sendTypingRef = useRef<((payload: TypingPayload) => void) | null>(null)
+  const lastTypingSentAtRef = useRef(0)
+  const typingTimeoutsRef = useRef<Map<string, number>>(new Map())
 
   const scrollToBottom = useCallback(() => {
     const el = listRef.current
@@ -94,7 +113,7 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
 
   // ── Realtime: assina ao montar, cancela ao desmontar ──
   useEffect(() => {
-    const unsubscribe = subscribeToMessages(
+    const { sendTyping, unsubscribe } = subscribeToMessages(
       campaignId,
       (row) => {
         setMessages((prev) => {
@@ -115,9 +134,39 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
       (id) => {
         setMessages((prev) => prev.filter((m) => m.id !== id))
       },
+      (payload) => {
+        if (payload.user_id === currentUserId) return
+
+        setTypingUsers((prev) => {
+          const next = new Map(prev)
+          next.set(payload.user_id, payload.display_name)
+          return next
+        })
+
+        const existingTimeout = typingTimeoutsRef.current.get(payload.user_id)
+        if (existingTimeout !== undefined) window.clearTimeout(existingTimeout)
+
+        const timeoutId = window.setTimeout(() => {
+          setTypingUsers((prev) => {
+            const next = new Map(prev)
+            next.delete(payload.user_id)
+            return next
+          })
+          typingTimeoutsRef.current.delete(payload.user_id)
+        }, TYPING_EXPIRE_MS)
+        typingTimeoutsRef.current.set(payload.user_id, timeoutId)
+      },
     )
-    return unsubscribe
-  }, [campaignId, scrollToBottom])
+
+    sendTypingRef.current = sendTyping
+
+    return () => {
+      sendTypingRef.current = null
+      typingTimeoutsRef.current.forEach((id) => window.clearTimeout(id))
+      typingTimeoutsRef.current.clear()
+      unsubscribe()
+    }
+  }, [campaignId, currentUserId, scrollToBottom])
 
   // ── Paginação: rolar até o topo carrega mensagens mais antigas ──
   const loadOlder = useCallback(async () => {
@@ -149,6 +198,22 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
     if (container.scrollTop < NEAR_TOP_PX) loadOlder()
   }
 
+  // ── Avisa aos outros que está digitando, com throttle ──
+  function handleDraftChange(value: string) {
+    setDraft(value)
+    setSendError(null)
+
+    const now = Date.now()
+    if (now - lastTypingSentAtRef.current < TYPING_BROADCAST_THROTTLE_MS) return
+    lastTypingSentAtRef.current = now
+
+    const myProfile = memberProfilesRef.current.get(currentUserId)
+    sendTypingRef.current?.({
+      user_id: currentUserId,
+      display_name: myProfile?.display_name ?? 'Alguém',
+    })
+  }
+
   // ── Envio ──
   async function handleSend() {
     const trimmed = draft.trim()
@@ -163,6 +228,12 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
       setSendError(err instanceof Error ? err.message : 'Não foi possível enviar a mensagem.')
     } finally {
       setSending(false)
+      // devolve o foco pro campo — clicar em "Enviar" não deve tirar o
+      // usuário do fluxo de digitação. Adiado um frame porque o campo
+      // ainda está `disabled` no DOM neste exato instante (só deixa de
+      // estar depois que o re-render do setSending(false) for aplicado),
+      // e um elemento desabilitado não aceita foco.
+      requestAnimationFrame(() => textareaRef.current?.focus())
     }
   }
 
@@ -242,16 +313,38 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
         })}
       </div>
 
+      {typingUsers.size > 0 && (
+        <div className="chat-typing-row" aria-live="polite">
+          <svg
+            className="chat-typing-bubble"
+            width="22" height="22" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" strokeWidth="1.8"
+            strokeLinecap="round" strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="10" r="7" />
+            <path d="M9 16.8 L7 20 L12.3 17.2" />
+            <circle className="chat-typing-dot chat-typing-dot--1" cx="8.5"  cy="10" r="1.2" fill="currentColor" stroke="none" />
+            <circle className="chat-typing-dot chat-typing-dot--2" cx="12"   cy="10" r="1.2" fill="currentColor" stroke="none" />
+            <circle className="chat-typing-dot chat-typing-dot--3" cx="15.5" cy="10" r="1.2" fill="currentColor" stroke="none" />
+          </svg>
+          <span className="chat-typing-text">
+            {formatTypingUsers(Array.from(typingUsers.values()))}
+          </span>
+        </div>
+      )}
+
       <div className="chat-panel__composer">
         {sendError && (
           <div className="chat-feedback chat-feedback--error" role="alert">{sendError}</div>
         )}
         <div className="chat-composer__row">
           <textarea
+            ref={textareaRef}
             className="input chat-composer__input"
             placeholder="Escreva uma mensagem..."
             value={draft}
-            onChange={(e) => { setDraft(e.target.value); setSendError(null) }}
+            onChange={(e) => handleDraftChange(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={sending}
             maxLength={2000}

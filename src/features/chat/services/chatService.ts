@@ -95,18 +95,28 @@ export async function deleteMessage(messageId: string): Promise<void> {
 // Realtime
 // ────────────────────────────────────────────────────────
 
+export interface TypingPayload {
+  user_id:      string
+  display_name: string
+}
+
 /**
- * Assina INSERT e DELETE de mensagens da campanha. O payload de
- * `postgres_changes` só traz as colunas cruas da tabela (sem join de
- * perfil) — quem chama resolve o autor por fora (ex: mapa local de
- * membros já carregado) usando `userId` e completando o `ChatMessage`.
- * Retorna uma função para cancelar a assinatura.
+ * Assina INSERT/DELETE de mensagens (postgres_changes) e "digitando..."
+ * (broadcast efêmero, nunca grava no banco — não faz sentido persistir
+ * isso) da campanha, no mesmo canal. O payload de `postgres_changes` só
+ * traz as colunas cruas da tabela (sem join de perfil) — quem chama
+ * resolve o autor por fora (ex: mapa local de membros já carregado)
+ * usando `userId` e completando o `ChatMessage`.
+ *
+ * Retorna `sendTyping` (pra avisar que o próprio usuário está digitando)
+ * e `unsubscribe` (cancela tudo — postgres_changes e broadcast).
  */
 export function subscribeToMessages(
   campaignId: string,
   onInsert: (row: { id: string; campaign_id: string; user_id: string; content: string; created_at: string }) => void,
   onDelete: (id: string) => void,
-): () => void {
+  onTyping: (payload: TypingPayload) => void,
+): { sendTyping: (payload: TypingPayload) => void; unsubscribe: () => void } {
   const channel: RealtimeChannel = supabase
     .channel(`campaign_messages:${campaignId}`)
     .on(
@@ -119,9 +129,19 @@ export function subscribeToMessages(
       { event: 'DELETE', schema: 'public', table: 'campaign_messages', filter: `campaign_id=eq.${campaignId}` },
       (payload) => onDelete((payload.old as { id: string }).id),
     )
+    .on(
+      'broadcast',
+      { event: 'typing' },
+      ({ payload }) => onTyping(payload as TypingPayload),
+    )
     .subscribe()
 
-  return () => { supabase.removeChannel(channel) }
+  return {
+    sendTyping: (payload) => {
+      void channel.send({ type: 'broadcast', event: 'typing', payload })
+    },
+    unsubscribe: () => { supabase.removeChannel(channel) },
+  }
 }
 
 // ────────────────────────────────────────────────────────
