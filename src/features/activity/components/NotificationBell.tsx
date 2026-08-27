@@ -55,7 +55,7 @@ export function NotificationBell() {
 
     setLoading(true)
     try {
-      setItems(await getRecentNotifications(5))
+      setItems(await getRecentNotifications(3))
     } catch (err) {
       console.error('Falha ao carregar notificações recentes:', err)
     } finally {

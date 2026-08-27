@@ -369,7 +369,7 @@ export async function getLiveNotifications(limit = 8): Promise<LiveNotification[
  * sino. Usa o mesmo conjunto de tipos que conta pro selo — mais amplo que
  * o do pop-up ao vivo (inclui membro saiu/removido, sessão editada/cancelada).
  */
-export async function getRecentNotifications(limit = 5): Promise<LiveNotification[]> {
+export async function getRecentNotifications(limit = 3): Promise<LiveNotification[]> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 

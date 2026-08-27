@@ -310,7 +310,7 @@ oculta conta só pro mestre — mesma regra de visibilidade da rolagem
 privada). Convites, atualização de campanha e de ficha não notificam,
 continuam só na aba Atividade.
 
-Clicar no sino abre um painel com as últimas 5 notificações (mesmo estilo
+Clicar no sino abre um painel com as últimas 3 notificações (mesmo estilo
 do popover de rolagem de dados) e marca tudo como visto. Sem Realtime —
 verifica a cada ~75s enquanto o app está aberto.
 
