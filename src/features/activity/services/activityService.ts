@@ -285,7 +285,7 @@ const POPUP_ACTIVITY_TYPES: ActivityType[] = ['note_created', 'session_created']
 type ActivityRow = { id: string; message: string; created_at: string; campaigns: { name: string } | null }
 type DiceRow = { id: string; formula: string | null; die_type: string; result: number; created_at: string; campaigns: { name: string } | null; profiles: { display_name: string } | null }
 type MemberRow = { id: string; created_at: string; campaigns: { name: string } | null }
-type MessageRow = { id: string; content: string; created_at: string; campaigns: { name: string } | null; profiles: { display_name: string } | null }
+type MessageRow = { id: string; content: string; recipient_id: string | null; created_at: string; campaigns: { name: string } | null; profiles: { display_name: string } | null }
 
 const MESSAGE_PREVIEW_LENGTH = 80
 
@@ -317,12 +317,21 @@ function mapMemberRow(row: MemberRow): LiveNotification {
 }
 
 function mapMessageRow(row: MessageRow): LiveNotification {
+  const name = row.profiles?.display_name ?? 'Alguém'
+  if (row.recipient_id) {
+    return {
+      id:           `message-${row.id}`,
+      message:      `Mensagem privada de ${name}`,
+      campaignName: row.campaigns?.name ?? 'Campanha',
+      createdAt:    row.created_at,
+    }
+  }
   const preview = row.content.length > MESSAGE_PREVIEW_LENGTH
     ? row.content.slice(0, MESSAGE_PREVIEW_LENGTH) + '…'
     : row.content
   return {
     id:           `message-${row.id}`,
-    message:      `${row.profiles?.display_name ?? 'Alguém'}: ${preview}`,
+    message:      `${name}: ${preview}`,
     campaignName: row.campaigns?.name ?? 'Campanha',
     createdAt:    row.created_at,
   }
@@ -423,7 +432,7 @@ export function subscribeToNewMessagesGlobally(
 export async function getMessageNotification(messageId: string): Promise<LiveNotification | null> {
   const { data, error } = await supabase
     .from('campaign_messages')
-    .select('id, content, created_at, campaigns(name), profiles(display_name)')
+    .select('id, content, recipient_id, created_at, campaigns(name), profiles(display_name)')
     .eq('id', messageId)
     .maybeSingle()
 
@@ -458,7 +467,7 @@ export async function getRecentNotifications(limit = 3): Promise<LiveNotificatio
       .limit(limit),
     supabase
       .from('campaign_messages')
-      .select('id, content, created_at, campaigns(name), profiles(display_name)')
+      .select('id, content, recipient_id, created_at, campaigns(name), profiles(display_name)')
       .neq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(limit),

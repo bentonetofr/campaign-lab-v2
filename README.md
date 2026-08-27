@@ -101,7 +101,7 @@ Authentication → URL Configuration
 
 As migrations devem ser aplicadas **em ordem**, uma por vez, no **Supabase Dashboard → SQL Editor → New query**.
 
-O repositório contém **32 migrations SQL**. A lista abaixo é o contrato canônico da
+O repositório contém **33 migrations SQL**. A lista abaixo é o contrato canônico da
 ordem de aplicação; não existe uma migration `20240121000000_my_sheets.sql` neste
 repositório e ela não deve ser criada ou aplicada sem uma decisão explícita de
 schema.
@@ -140,6 +140,7 @@ schema.
 | 30 | `20240132000000_notification_seen_at.sql` | Adiciona `profiles.activity_seen_at` — marca quando o usuário viu notificações pela última vez |
 | 31 | `20240133000000_campaign_chat.sql` | Adiciona `campaign_messages` (com Realtime habilitado) e `campaign_chat_reads` + RPC `mark_campaign_chat_read` — chat da campanha em tempo real |
 | 32 | `20240134000000_campaign_messages_replica_identity.sql` | `REPLICA IDENTITY FULL` em `campaign_messages` — sem isso, o evento de DELETE em tempo real não chega (o filtro por `campaign_id` não bate com o payload reduzido padrão) |
+| 33 | `20240135000000_private_messages.sql` | Adiciona `campaign_messages.recipient_id` (mensagem privada) com policies atualizadas — só mestre⇄jogador, nunca jogador⇄jogador — e `campaign_private_message_reads` + RPCs `mark_private_thread_read`/`get_private_message_unread_counts` |
 
 > **Usuários criados antes da migration 1:** o trigger `handle_new_user` cria perfis apenas para novos cadastros. Para sincronizar usuários já existentes, rode o script de backfill comentado na seção 9 da migration 1.
 
@@ -167,7 +168,7 @@ Antes de abrir um deploy ou adicionar uma migration, execute:
 npm run verify
 ```
 
-O comando valida as 32 migrations registradas e depois executa o build de produção.
+O comando valida as 33 migrations registradas e depois executa o build de produção.
 
 ---
 
@@ -218,6 +219,7 @@ O sistema de uma campanha é escolhido no momento da criação e **não pode ser
 | Sino de notificações — selo global de eventos novos em todas as campanhas | ✅ |
 | Pop-up ao vivo (5s) para rolagem pública, nova nota, nova sessão e novo membro | ✅ |
 | Chat da campanha em tempo real (Realtime), com selo de não lidas na aba | ✅ |
+| Mensagens privadas no chat — mestre com cada jogador, individualmente | ✅ |
 | Área da campanha por abas (Visão geral / Membros / Sessões / Ficha / Configurações) | ✅ |
 | Sessões da campanha — criar, editar e excluir pelo mestre | ✅ |
 | Sessões — visualização com título, data e resumo para jogadores | ✅ |
@@ -351,9 +353,10 @@ Configurações. É a primeira funcionalidade do projeto com **Supabase
 Realtime de verdade** — mensagem aparece pros outros membros na hora, via
 subscription (`postgres_changes`), sem polling.
 
-- Uma conversa por campanha, compartilhada entre todos os membros.
+- Uma conversa por campanha (a "Mesa"), compartilhada entre todos os membros.
 - Autor apaga a própria mensagem; o mestre pode apagar qualquer mensagem
-  da campanha.
+  da campanha. Clicar em apagar pede confirmação inline ("Apagar esta
+  mensagem?") antes de excluir de verdade.
 - Sem edição de mensagem, sem menções, sem anexos.
 - Histórico paginado: carrega as últimas ~30 mensagens ao abrir, e rolar
   até o topo busca mensagens mais antigas mantendo a posição de leitura.
@@ -365,9 +368,30 @@ subscription (`postgres_changes`), sem polling.
   de outra pessoa **enquanto a aba de chat já está aberta** — o pop-up
   global fica suprimido nesse caso, então esse som é o único aviso.
 
-**Migration necessária:** `20240133000000_campaign_chat.sql` deve estar
-aplicada — ela também habilita a publicação Realtime para
-`campaign_messages` (`alter publication supabase_realtime add table`).
+### Mensagens privadas
+
+Uma barra lateral dentro da aba Chat lista, além de "Mesa", as conversas
+privadas possíveis: o mestre vê um item por jogador; o jogador vê só
+"Mestre". Clicar troca a conversa exibida — mensagens, "digitando..." e
+envio passam a valer só para aquela conversa.
+
+- **Só mestre⇄jogador.** Não existe conversa privada entre dois
+  jogadores — travado na policy de INSERT do banco, não só na interface.
+- **Selo separado**, com cor própria (dourado, diferente do selo
+  vermelho da mesa), somando as não lidas de todas as conversas privadas.
+  Só abaixa conforme cada conversa é aberta — não zera com um clique
+  genérico na aba Chat, que abre na "Mesa" por padrão.
+- Reaproveita toda a infraestrutura do chat (Realtime, paginação, exclusão
+  com confirmação, digitando, som) — uma mensagem privada é uma linha de
+  `campaign_messages` com `recipient_id` preenchido, em vez de uma tabela
+  separada.
+- O pop-up global e o histórico do sino mostram "Mensagem privada de
+  Fulano" (sem preview do conteúdo) quando aplicável.
+
+**Migrations necessárias:** `20240133000000_campaign_chat.sql` (base do
+chat — também habilita a publicação Realtime para `campaign_messages` via
+`alter publication supabase_realtime add table`) e
+`20240135000000_private_messages.sql` (mensagens privadas).
 
 ---
 
@@ -421,7 +445,7 @@ Toda inserção em `campaign_members` acontece via RPC (`add_campaign_player`, `
 
 ```
 supabase/
-└── migrations/             ← 27 migrations em ordem
+└── migrations/             ← 33 migrations em ordem
 
 src/
 ├── app/

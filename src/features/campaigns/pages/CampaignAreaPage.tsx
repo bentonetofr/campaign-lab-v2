@@ -13,7 +13,7 @@ import { CampaignSettingsPanel }  from '../components/CampaignSettingsPanel'
 import { CampaignActivityPanel }  from '../../activity/components/CampaignActivityPanel'
 import { CampaignNotesPanel }     from '../../notes/components/CampaignNotesPanel'
 import { CampaignChatPanel }      from '../../chat/components/CampaignChatPanel'
-import { getChatUnreadCount, markChatRead } from '../../chat/services/chatService'
+import { getChatUnreadCount, markChatRead, getPrivateUnreadCounts } from '../../chat/services/chatService'
 import type { CampaignWithRole } from '../../../shared/types'
 import './CampaignPages.css'
 
@@ -52,6 +52,7 @@ export function CampaignAreaPage() {
   const [error, setError]         = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('visao-geral')
   const [chatUnread, setChatUnread] = useState(0)
+  const [privateUnread, setPrivateUnread] = useState(0)
 
   useEffect(() => {
     if (!campaignId || !user) return
@@ -91,6 +92,24 @@ export function CampaignAreaPage() {
     const interval = setInterval(refresh, 60_000)
     return () => { cancelled = true; clearInterval(interval) }
   }, [campaign?.id, activeTab])
+
+  // ── Selo de mensagem privada não lida — selo separado do selo da mesa
+  // acima; não zera ao simplesmente abrir a aba Chat (que abre na visão
+  // "Mesa" por padrão), só quando o usuário entra em cada conversa
+  // privada específica dentro do painel ──
+  useEffect(() => {
+    if (!campaign?.id) { setPrivateUnread(0); return }
+    let cancelled = false
+    async function refresh() {
+      try {
+        const counts = await getPrivateUnreadCounts(campaign!.id)
+        if (!cancelled) setPrivateUnread(Array.from(counts.values()).reduce((sum, n) => sum + n, 0))
+      } catch { /* selo só deixa de atualizar, não quebra a tela */ }
+    }
+    refresh()
+    const interval = setInterval(refresh, 60_000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [campaign?.id])
 
   function handleTabClick(tabId: TabId) {
     setActiveTab(tabId)
@@ -178,6 +197,11 @@ export function CampaignAreaPage() {
             <span className="campaign-tab__label">{tab.label}</span>
             {tab.id === 'chat' && chatUnread > 0 && (
               <span className="campaign-tab__badge">{chatUnread > 99 ? '99+' : chatUnread}</span>
+            )}
+            {tab.id === 'chat' && privateUnread > 0 && (
+              <span className="campaign-tab__badge campaign-tab__badge--private" title="Mensagem privada não lida">
+                {privateUnread > 99 ? '99+' : privateUnread}
+              </span>
             )}
           </button>
         ))}

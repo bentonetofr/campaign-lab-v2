@@ -502,6 +502,10 @@
   line-height: 16px;
   text-align: center;
 }
+.campaign-tab__badge--private {
+  background: var(--gilded-bright);
+  color: var(--bg-base);
+}
 
 /* ── Área da campanha (legado) ── */
 .campaign-area { flex: 1; }

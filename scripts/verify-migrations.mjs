@@ -36,6 +36,7 @@ const expectedMigrations = [
   '20240132000000_notification_seen_at.sql',
   '20240133000000_campaign_chat.sql',
   '20240134000000_campaign_messages_replica_identity.sql',
+  '20240135000000_private_messages.sql',
 ]
 
 const actualMigrations = readdirSync(migrationDirectory)

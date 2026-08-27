@@ -5,11 +5,14 @@ import {
   deleteMessage,
   subscribeToMessages,
   markChatRead,
+  getPrivateUnreadCounts,
+  markPrivateThreadRead,
   type ChatMessage,
   type TypingPayload,
 } from '../services/chatService'
 import { getCampaignMembers } from '../../members/services/memberService'
 import { useActiveChat } from '../ActiveChatContext'
+import type { CampaignMemberWithProfile } from '../../../shared/types'
 import './CampaignChatPanel.css'
 
 // ────────────────────────────────────────────────────────
@@ -21,6 +24,9 @@ interface CampaignChatPanelProps {
   currentUserId: string
   userRole:      'master' | 'player'
 }
+
+/** Mesa (pública) ou uma conversa privada com um usuário específico. */
+type ActiveThread = { type: 'public' } | { type: 'private'; userId: string; name: string }
 
 const PAGE_SIZE = 30
 const NEAR_BOTTOM_PX = 100
@@ -86,6 +92,10 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
 
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map())
 
+  const [members, setMembers] = useState<CampaignMemberWithProfile[]>([])
+  const [activeThread, setActiveThread] = useState<ActiveThread>({ type: 'public' })
+  const [privateUnread, setPrivateUnread] = useState<Map<string, number>>(new Map())
+
   const listRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isNearBottomRef = useRef(true)
@@ -93,8 +103,19 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
   const sendTypingRef = useRef<((payload: TypingPayload) => void) | null>(null)
   const lastTypingSentAtRef = useRef(0)
   const typingTimeoutsRef = useRef<Map<string, number>>(new Map())
+  // Espelha `activeThread` pros handlers do Realtime (assinados uma vez só,
+  // ver useEffect mais abaixo) sempre lerem a conversa ATUAL, sem recriar
+  // o canal a cada troca de conversa.
+  const activeThreadRef = useRef<ActiveThread>(activeThread)
 
   const { setActiveChatCampaignId } = useActiveChat()
+
+  // undefined = mesa (pública); id do outro usuário = conversa privada.
+  const threadWith = activeThread.type === 'private' ? activeThread.userId : undefined
+
+  useEffect(() => {
+    activeThreadRef.current = activeThread
+  }, [activeThread])
 
   // Avisa globalmente "estou vendo o chat desta campanha" — o pop-up de
   // notificação usa isso pra não interromper com uma mensagem que o
@@ -110,17 +131,35 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
     if (el) el.scrollTop = el.scrollHeight
   }, [])
 
-  // ── Carga inicial: perfis dos membros (pra enriquecer eventos do Realtime,
-  // que não trazem join) + primeira página de mensagens ──
+  // ── Membros da campanha: uma vez por campanha — alimenta a lista de
+  // conversas privadas possíveis (barra lateral) e o mapa usado pra
+  // resolver autor de eventos do Realtime, que não trazem join de perfil ──
   useEffect(() => {
     let cancelled = false
 
-    async function init() {
+    async function loadMembers() {
       try {
-        const members = await getCampaignMembers(campaignId)
-        memberProfilesRef.current = new Map(members.map((m) => [m.user_id, m.profile]))
+        const list = await getCampaignMembers(campaignId)
+        if (cancelled) return
+        setMembers(list)
+        memberProfilesRef.current = new Map(list.map((m) => [m.user_id, m.profile]))
+      } catch {
+        // sem a lista, o chat da mesa ainda funciona — só fica sem a barra lateral
+      }
+    }
 
-        const initial = await getCampaignMessages(campaignId)
+    loadMembers()
+    return () => { cancelled = true }
+  }, [campaignId])
+
+  // ── Mensagens da conversa ativa (mesa ou privada) — recarrega ao trocar ──
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadThread() {
+      setLoading(true)
+      try {
+        const initial = await getCampaignMessages(campaignId, undefined, PAGE_SIZE, threadWith)
         if (cancelled) return
         setMessages(initial)
         setHasMore(initial.length >= PAGE_SIZE)
@@ -135,17 +174,64 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
       }
     }
 
-    init()
-    markChatRead(campaignId).catch(() => { /* silencioso */ })
+    loadThread()
+
+    if (threadWith) {
+      markPrivateThreadRead(campaignId, threadWith).catch(() => { /* silencioso */ })
+      setPrivateUnread((prev) => {
+        if (!prev.has(threadWith)) return prev
+        const next = new Map(prev)
+        next.delete(threadWith)
+        return next
+      })
+    } else {
+      markChatRead(campaignId).catch(() => { /* silencioso */ })
+    }
 
     return () => { cancelled = true }
-  }, [campaignId, scrollToBottom])
+  }, [campaignId, threadWith, scrollToBottom])
 
-  // ── Realtime: assina ao montar, cancela ao desmontar ──
+  // ── Não lidas de conversas privadas — carga inicial (cobre mensagens
+  // que chegaram enquanto o usuário estava fora desta campanha) ──
+  useEffect(() => {
+    let cancelled = false
+    getPrivateUnreadCounts(campaignId)
+      .then((counts) => { if (!cancelled) setPrivateUnread(counts) })
+      .catch(() => { /* selo só deixa de aparecer, não quebra o chat */ })
+    return () => { cancelled = true }
+  }, [campaignId])
+
+  // ── Realtime: assina ao montar, cancela ao desmontar. Um canal só por
+  // campanha (não recria ao trocar de conversa) — os handlers decidem se
+  // a linha pertence à conversa aberta agora via `activeThreadRef` ──
   useEffect(() => {
     const { sendTyping, unsubscribe } = subscribeToMessages(
       campaignId,
       (row) => {
+        const current = activeThreadRef.current
+        const isPublicRow = row.recipient_id === null
+
+        if (isPublicRow) {
+          if (current.type !== 'public') return
+        } else {
+          const otherParty = row.user_id === currentUserId ? row.recipient_id : row.user_id
+          const isActiveThread = current.type === 'private' && current.userId === otherParty
+          if (!isActiveThread) {
+            // Mensagem privada de/para outra conversa — só soma no
+            // contador local se for endereçada a mim (não ao ver a minha
+            // própria mensagem privada ecoar em outra aba/dispositivo).
+            if (row.recipient_id === currentUserId) {
+              setPrivateUnread((prev) => {
+                const next = new Map(prev)
+                next.set(row.user_id, (next.get(row.user_id) ?? 0) + 1)
+                return next
+              })
+              playNewMessageSound()
+            }
+            return
+          }
+        }
+
         setMessages((prev) => {
           if (prev.some((m) => m.id === row.id)) return prev
           const profile = memberProfilesRef.current.get(row.user_id)
@@ -154,6 +240,7 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
             id: row.id,
             campaign_id: row.campaign_id,
             user_id: row.user_id,
+            recipient_id: row.recipient_id,
             content: row.content,
             created_at: row.created_at,
             profile,
@@ -167,6 +254,12 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
       },
       (payload) => {
         if (payload.user_id === currentUserId) return
+
+        const current = activeThreadRef.current
+        const relevant = current.type === 'public'
+          ? payload.thread_user_id === undefined
+          : payload.user_id === current.userId && payload.thread_user_id === currentUserId
+        if (!relevant) return
 
         setTypingUsers((prev) => {
           const next = new Map(prev)
@@ -206,7 +299,7 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
     const container = listRef.current
     const prevScrollHeight = container?.scrollHeight ?? 0
     try {
-      const older = await getCampaignMessages(campaignId, messages[0].created_at)
+      const older = await getCampaignMessages(campaignId, messages[0].created_at, PAGE_SIZE, threadWith)
       if (older.length < PAGE_SIZE) setHasMore(false)
       if (older.length > 0) {
         setMessages((prev) => [...older, ...prev])
@@ -219,7 +312,7 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
     } finally {
       setLoadingMore(false)
     }
-  }, [campaignId, messages, loadingMore, hasMore])
+  }, [campaignId, messages, loadingMore, hasMore, threadWith])
 
   function handleScroll() {
     const container = listRef.current
@@ -242,6 +335,7 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
     sendTypingRef.current?.({
       user_id: currentUserId,
       display_name: myProfile?.display_name ?? 'Alguém',
+      thread_user_id: threadWith,
     })
   }
 
@@ -252,7 +346,7 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
     setSending(true)
     setSendError(null)
     try {
-      await sendMessage(campaignId, trimmed)
+      await sendMessage(campaignId, trimmed, threadWith)
       setDraft('')
       // sem otimismo local — a mensagem aparece quando o próprio Realtime ecoar
     } catch (err) {
@@ -288,133 +382,176 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
     }
   }
 
+  // Quem pode aparecer como conversa privada: pro mestre, cada jogador;
+  // pro jogador, só o mestre.
+  const otherPartyList = userRole === 'master'
+    ? members.filter((m) => m.role === 'player')
+    : members.filter((m) => m.role === 'master')
+
   // ────────────────────────────────────────────────────
   return (
     <section className="chat-panel">
-      <div className="chat-panel__list" ref={listRef} onScroll={handleScroll}>
-        {loadingMore && (
-          <div className="chat-panel__loading-more">
-            <div className="spinner spinner--sm" />
-          </div>
-        )}
+      <aside className="chat-sidebar">
+        <button
+          type="button"
+          className={`chat-sidebar__item${activeThread.type === 'public' ? ' chat-sidebar__item--active' : ''}`}
+          onClick={() => setActiveThread({ type: 'public' })}
+        >
+          <span className="chat-sidebar__name">Mesa</span>
+        </button>
 
-        {loading && (
-          <div className="chat-panel__state">
-            <div className="spinner spinner--sm" />
-            <span>Carregando mensagens...</span>
-          </div>
-        )}
-
-        {!loading && error && (
-          <div className="chat-feedback chat-feedback--error" role="alert">{error}</div>
-        )}
-
-        {!loading && !error && messages.length === 0 && (
-          <p className="chat-panel__empty">Nenhuma mensagem ainda. Comece a conversa.</p>
-        )}
-
-        {!loading && messages.map((m) => {
-          const isOwn = m.user_id === currentUserId
-          const canDelete = isOwn || userRole === 'master'
+        {otherPartyList.map((m) => {
+          const unread = privateUnread.get(m.user_id) ?? 0
+          const isActive = activeThread.type === 'private' && activeThread.userId === m.user_id
+          const label = userRole === 'master' ? m.profile.display_name : 'Mestre'
           return (
-            <div key={m.id} className={`chat-message${isOwn ? ' chat-message--own' : ''}`}>
-              <span className="chat-message__avatar" aria-hidden="true">
-                {m.profile.avatar_url
-                  ? <img src={m.profile.avatar_url} alt="" />
-                  : m.profile.display_name.charAt(0).toUpperCase()}
-              </span>
-              <div className="chat-message__body">
-                <div className="chat-message__meta">
-                  <span className="chat-message__name">{isOwn ? 'Você' : m.profile.display_name}</span>
-                  <time className="chat-message__time" dateTime={m.created_at}>
-                    {formatMessageTime(m.created_at)}
-                  </time>
-                </div>
-                <p className="chat-message__content">{m.content}</p>
-
-                {confirmDeleteId === m.id && (
-                  <div className="chat-message__confirm">
-                    <span className="chat-message__confirm-text">Apagar esta mensagem?</span>
-                    <button
-                      type="button"
-                      className="btn btn-danger chat-message__confirm-btn"
-                      onClick={() => handleDelete(m.id)}
-                      disabled={deletingId === m.id}
-                    >
-                      {deletingId === m.id ? <span className="spinner spinner--sm" /> : 'Apagar'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost chat-message__confirm-btn"
-                      onClick={() => setConfirmDeleteId(null)}
-                      disabled={deletingId === m.id}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                )}
-              </div>
-              {canDelete && confirmDeleteId !== m.id && (
-                <button
-                  type="button"
-                  className="chat-message__delete"
-                  onClick={() => setConfirmDeleteId(m.id)}
-                  aria-label="Apagar mensagem"
-                  title="Apagar mensagem"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
+            <button
+              key={m.user_id}
+              type="button"
+              className={`chat-sidebar__item${isActive ? ' chat-sidebar__item--active' : ''}`}
+              onClick={() => setActiveThread({ type: 'private', userId: m.user_id, name: label })}
+            >
+              <span className="chat-sidebar__name">{label}</span>
+              {unread > 0 && <span className="chat-sidebar__badge">{unread > 99 ? '99+' : unread}</span>}
+            </button>
           )
         })}
-      </div>
+      </aside>
 
-      {typingUsers.size > 0 && (
-        <div className="chat-typing-row" aria-live="polite">
-          <svg
-            className="chat-typing-bubble"
-            width="22" height="22" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" strokeWidth="1.8"
-            strokeLinecap="round" strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="10" r="7" />
-            <path d="M9 16.8 L7 20 L12.3 17.2" />
-            <circle className="chat-typing-dot chat-typing-dot--1" cx="8.5"  cy="10" r="1.2" fill="currentColor" stroke="none" />
-            <circle className="chat-typing-dot chat-typing-dot--2" cx="12"   cy="10" r="1.2" fill="currentColor" stroke="none" />
-            <circle className="chat-typing-dot chat-typing-dot--3" cx="15.5" cy="10" r="1.2" fill="currentColor" stroke="none" />
-          </svg>
-          <span className="chat-typing-text">
-            {formatTypingUsers(Array.from(typingUsers.values()))}
-          </span>
-        </div>
-      )}
-
-      <div className="chat-panel__composer">
-        {sendError && (
-          <div className="chat-feedback chat-feedback--error" role="alert">{sendError}</div>
+      <div className="chat-panel__main">
+        {activeThread.type === 'private' && (
+          <div className="chat-thread-banner">🔒 Conversa privada com {activeThread.name}</div>
         )}
-        <div className="chat-composer__row">
-          <textarea
-            ref={textareaRef}
-            className="input chat-composer__input"
-            placeholder="Escreva uma mensagem..."
-            value={draft}
-            onChange={(e) => handleDraftChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={sending}
-            maxLength={2000}
-            rows={1}
-          />
-          <button
-            type="button"
-            className="btn btn-primary chat-composer__send"
-            onClick={handleSend}
-            disabled={sending || !draft.trim()}
-          >
-            {sending ? <span className="spinner spinner--sm" /> : 'Enviar'}
-          </button>
+
+        <div className="chat-panel__list" ref={listRef} onScroll={handleScroll}>
+          {loadingMore && (
+            <div className="chat-panel__loading-more">
+              <div className="spinner spinner--sm" />
+            </div>
+          )}
+
+          {loading && (
+            <div className="chat-panel__state">
+              <div className="spinner spinner--sm" />
+              <span>Carregando mensagens...</span>
+            </div>
+          )}
+
+          {!loading && error && (
+            <div className="chat-feedback chat-feedback--error" role="alert">{error}</div>
+          )}
+
+          {!loading && !error && messages.length === 0 && (
+            <p className="chat-panel__empty">
+              {activeThread.type === 'private'
+                ? 'Nenhuma mensagem ainda. Comece a conversa privada.'
+                : 'Nenhuma mensagem ainda. Comece a conversa.'}
+            </p>
+          )}
+
+          {!loading && messages.map((m) => {
+            const isOwn = m.user_id === currentUserId
+            const canDelete = isOwn || userRole === 'master'
+            return (
+              <div key={m.id} className={`chat-message${isOwn ? ' chat-message--own' : ''}`}>
+                <span className="chat-message__avatar" aria-hidden="true">
+                  {m.profile.avatar_url
+                    ? <img src={m.profile.avatar_url} alt="" />
+                    : m.profile.display_name.charAt(0).toUpperCase()}
+                </span>
+                <div className="chat-message__body">
+                  <div className="chat-message__meta">
+                    <span className="chat-message__name">{isOwn ? 'Você' : m.profile.display_name}</span>
+                    <time className="chat-message__time" dateTime={m.created_at}>
+                      {formatMessageTime(m.created_at)}
+                    </time>
+                  </div>
+                  <p className="chat-message__content">{m.content}</p>
+
+                  {confirmDeleteId === m.id && (
+                    <div className="chat-message__confirm">
+                      <span className="chat-message__confirm-text">Apagar esta mensagem?</span>
+                      <button
+                        type="button"
+                        className="btn btn-danger chat-message__confirm-btn"
+                        onClick={() => handleDelete(m.id)}
+                        disabled={deletingId === m.id}
+                      >
+                        {deletingId === m.id ? <span className="spinner spinner--sm" /> : 'Apagar'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost chat-message__confirm-btn"
+                        onClick={() => setConfirmDeleteId(null)}
+                        disabled={deletingId === m.id}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {canDelete && confirmDeleteId !== m.id && (
+                  <button
+                    type="button"
+                    className="chat-message__delete"
+                    onClick={() => setConfirmDeleteId(m.id)}
+                    aria-label="Apagar mensagem"
+                    title="Apagar mensagem"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {typingUsers.size > 0 && (
+          <div className="chat-typing-row" aria-live="polite">
+            <svg
+              className="chat-typing-bubble"
+              width="22" height="22" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="10" r="7" />
+              <path d="M9 16.8 L7 20 L12.3 17.2" />
+              <circle className="chat-typing-dot chat-typing-dot--1" cx="8.5"  cy="10" r="1.2" fill="currentColor" stroke="none" />
+              <circle className="chat-typing-dot chat-typing-dot--2" cx="12"   cy="10" r="1.2" fill="currentColor" stroke="none" />
+              <circle className="chat-typing-dot chat-typing-dot--3" cx="15.5" cy="10" r="1.2" fill="currentColor" stroke="none" />
+            </svg>
+            <span className="chat-typing-text">
+              {formatTypingUsers(Array.from(typingUsers.values()))}
+            </span>
+          </div>
+        )}
+
+        <div className="chat-panel__composer">
+          {sendError && (
+            <div className="chat-feedback chat-feedback--error" role="alert">{sendError}</div>
+          )}
+          <div className="chat-composer__row">
+            <textarea
+              ref={textareaRef}
+              className="input chat-composer__input"
+              placeholder={activeThread.type === 'private' ? 'Escreva uma mensagem privada...' : 'Escreva uma mensagem...'}
+              value={draft}
+              onChange={(e) => handleDraftChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={sending}
+              maxLength={2000}
+              rows={1}
+            />
+            <button
+              type="button"
+              className="btn btn-primary chat-composer__send"
+              onClick={handleSend}
+              disabled={sending || !draft.trim()}
+            >
+              {sending ? <span className="spinner spinner--sm" /> : 'Enviar'}
+            </button>
+          </div>
         </div>
       </div>
     </section>
