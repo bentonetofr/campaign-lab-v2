@@ -335,16 +335,18 @@ function mapMessageRow(row: MessageRow): LiveNotification {
  * Diferente do selo, rolagem oculta nunca aparece aqui (nem pro mestre) —
  * só rolagem pública. "Fui adicionado a uma campanha" não dá pra pegar de
  * forma confiável pelo actor_id de campaign_activity (varia se foi convite
- * por e-mail ou link), então lê direto de campaign_members. Mensagem de
- * chat também vira pop-up (com prévia do conteúdo) — mas, diferente dos
- * outros tipos, não conta no selo do sino global, só no selo da própria
- * aba de chat.
+ * por e-mail ou link), então lê direto de campaign_members.
+ *
+ * Mensagem de chat NÃO entra aqui — ao contrário das outras fontes, ela é
+ * pega via Realtime de verdade (`subscribeToNewMessagesGlobally` +
+ * `getMessageNotification` logo abaixo), pra não ficar até 20s atrasada
+ * em relação à mensagem que já chegou instantânea no próprio chat.
  */
 export async function getLiveNotifications(limit = 8): Promise<LiveNotification[]> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  const [activityRes, diceRes, memberRes, messageRes] = await Promise.all([
+  const [activityRes, diceRes, memberRes] = await Promise.all([
     supabase
       .from('campaign_activity')
       .select('id, message, created_at, campaigns(name)')
@@ -365,29 +367,66 @@ export async function getLiveNotifications(limit = 8): Promise<LiveNotification[
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(limit),
-    supabase
-      .from('campaign_messages')
-      .select('id, content, created_at, campaigns(name), profiles(display_name)')
-      .neq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(limit),
   ])
 
   if (activityRes.error) console.error('[getLiveNotifications] erro em campaign_activity:', activityRes.error)
   if (diceRes.error)     console.error('[getLiveNotifications] erro em dice_rolls:', diceRes.error)
   if (memberRes.error)   console.error('[getLiveNotifications] erro em campaign_members:', memberRes.error)
-  if (messageRes.error)  console.error('[getLiveNotifications] erro em campaign_messages:', messageRes.error)
 
   const events: LiveNotification[] = [
     ...((activityRes.data ?? []) as unknown as ActivityRow[]).map(mapActivityRow),
     ...((diceRes.data ?? []) as unknown as DiceRow[]).map(mapDiceRow),
     ...((memberRes.data ?? []) as unknown as MemberRow[]).map(mapMemberRow),
-    ...((messageRes.data ?? []) as unknown as MessageRow[]).map(mapMessageRow),
   ]
 
   // mais antigo primeiro, pra fila do pop-up mostrar em ordem cronológica
   events.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   return events
+}
+
+/**
+ * Assina INSERT em `campaign_messages` de TODAS as campanhas do usuário —
+ * sem filtro de campaign_id. Funciona porque o Realtime do Supabase
+ * respeita RLS: só chegam eventos de linhas que o usuário autenticado
+ * teria permissão de SELECT de qualquer forma (ou seja, campanhas onde
+ * ele é membro). Usado só pra notificar mensagem nova na hora — a
+ * conversa em si (`CampaignChatPanel`) assina o canal por campanha, à
+ * parte. Ignora a própria mensagem do usuário (`currentUserId`).
+ */
+export function subscribeToNewMessagesGlobally(
+  currentUserId: string,
+  onMessage: (messageId: string) => void,
+): () => void {
+  const channel = supabase
+    .channel('global-chat-notifications')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'campaign_messages' },
+      (payload) => {
+        const row = payload.new as { id: string; user_id: string }
+        if (row.user_id === currentUserId) return
+        onMessage(row.id)
+      },
+    )
+    .subscribe()
+
+  return () => { supabase.removeChannel(channel) }
+}
+
+/**
+ * Busca uma mensagem específica já formatada como notificação. O evento
+ * de Realtime só traz as colunas cruas (sem nome do autor/campanha) —
+ * essa busca completa com uma consulta pelo id.
+ */
+export async function getMessageNotification(messageId: string): Promise<LiveNotification | null> {
+  const { data, error } = await supabase
+    .from('campaign_messages')
+    .select('id, content, created_at, campaigns(name), profiles(display_name)')
+    .eq('id', messageId)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return mapMessageRow(data as unknown as MessageRow)
 }
 
 /**

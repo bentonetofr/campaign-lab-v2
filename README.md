@@ -325,11 +325,15 @@ mestre) — fica discreta de propósito. Mensagem de chat vira pop-up mas
 **não** conta no selo do sino global — o "não lido" de chat mora só na
 própria aba (ver seção "Chat da campanha").
 
-Checa a cada 60s, também sem Realtime. O relógio desse pop-up é separado
-do sino e só existe na memória do navegador — recarregar a página zera e
-passa a valer só dali pra frente, pra não disparar uma enxurrada de
-pop-ups de coisa antiga a cada F5. Vários eventos no mesmo intervalo
-aparecem um de cada vez, nunca empilhados.
+Checa a cada 60s, também sem Realtime — exceto mensagem de chat, que usa
+Realtime de verdade (assina `campaign_messages` em todas as campanhas do
+usuário, sem filtro de campanha; funciona porque o Realtime do Supabase
+já respeita RLS) e por isso aparece na hora, sem esperar o próximo ciclo.
+O relógio de "já visto" desse pop-up é separado do sino e só existe na
+memória do navegador — recarregar a página zera e passa a valer só dali
+pra frente, pra não disparar uma enxurrada de pop-ups de coisa antiga a
+cada F5. Vários eventos no mesmo intervalo aparecem um de cada vez, nunca
+empilhados.
 
 ---
 

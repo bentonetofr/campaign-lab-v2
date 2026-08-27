@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
-import { getLiveNotifications, type LiveNotification } from '../services/activityService'
+import {
+  getLiveNotifications,
+  getMessageNotification,
+  subscribeToNewMessagesGlobally,
+  type LiveNotification,
+} from '../services/activityService'
 import './NotificationPopup.css'
 
 // Mais rápido que o sino de propósito — é o mecanismo "ao vivo", quer parecer
@@ -62,6 +67,24 @@ export function NotificationPopup() {
     const interval = setInterval(poll, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [user, poll])
+
+  // ── Mensagem de chat é Realtime de verdade, não polling — dispara o
+  // pop-up na hora, em vez de esperar até 20s pelo próximo ciclo acima. ──
+  useEffect(() => {
+    if (!user) return
+
+    const unsubscribe = subscribeToNewMessagesGlobally(user.id, async (messageId) => {
+      const id = `message-${messageId}`
+      if (!seenIdsRef.current) seenIdsRef.current = new Set()
+      if (seenIdsRef.current.has(id)) return
+      seenIdsRef.current.add(id)
+
+      const notif = await getMessageNotification(messageId)
+      if (notif) setQueue((q) => [...q, notif])
+    })
+
+    return unsubscribe
+  }, [user])
 
   // Consome a fila um item de cada vez.
   useEffect(() => {
