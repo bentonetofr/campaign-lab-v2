@@ -4,7 +4,9 @@ import {
   getCampaignRolls,
   parseDiceFormula,
   rollDice,
+  subscribeToRolls,
 } from '../services/diceService'
+import { getCampaignMembers } from '../../members/services/memberService'
 import type { DiceRoll, DiceRollWithProfile } from '../../../shared/types'
 import './DiceRollerPanel.css'
 
@@ -68,6 +70,10 @@ export function DiceRollerPanel({ campaignId, currentUserId, onRoll }: DiceRolle
   const [histRefreshing, setHistRefreshing] = useState(false)
   const [histError, setHistError]       = useState<string | null>(null)
 
+  // Perfis dos membros — resolve o autor de rolagens que chegam pelo
+  // Realtime, cujo payload só traz as colunas cruas (sem join de perfil).
+  const memberProfilesRef = useRef<Map<string, DiceRollWithProfile['profile']>>(new Map())
+
   // ── Carregar histórico ──
   const loadHistory = useCallback(async (refresh = false) => {
     if (refresh) setHistRefreshing(true)
@@ -85,6 +91,32 @@ export function DiceRollerPanel({ campaignId, currentUserId, onRoll }: DiceRolle
   }, [campaignId])
 
   useEffect(() => { loadHistory() }, [loadHistory])
+
+  useEffect(() => {
+    let cancelled = false
+    getCampaignMembers(campaignId)
+      .then((members) => {
+        if (!cancelled) memberProfilesRef.current = new Map(members.map((m) => [m.user_id, m.profile]))
+      })
+      .catch(() => { /* sem o mapa, rolagem de outro jogador cai no nome genérico */ })
+    return () => { cancelled = true }
+  }, [campaignId])
+
+  // ── Realtime: rolagem de outro jogador/mestre entra na lista na hora,
+  // sem precisar clicar em "Atualizar". A própria rolagem já é tratada
+  // pelo `loadHistory(true)` em `executeRoll`, então ignora aqui pra não
+  // duplicar. ──
+  useEffect(() => {
+    const unsubscribe = subscribeToRolls(campaignId, (row: DiceRoll) => {
+      if (row.user_id === currentUserId) return
+      setHistory((prev) => {
+        if (prev.some((r) => r.id === row.id)) return prev
+        const profile = memberProfilesRef.current.get(row.user_id) ?? { id: row.user_id, display_name: 'Alguém' }
+        return [{ ...row, profile }, ...prev].slice(0, RECENT_ROLLS_LIMIT)
+      })
+    })
+    return unsubscribe
+  }, [campaignId, currentUserId])
 
   // ── Executar rolagem ──
   async function executeRoll(formula: string) {

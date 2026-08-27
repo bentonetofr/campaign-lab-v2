@@ -6,7 +6,7 @@ Plataforma web para gerenciamento de campanhas de RPG de mesa.
 
 Vorterium permite que mestres criem campanhas, adicionem jogadores, gerenciem fichas simples de personagem e registrem rolagens de dados — tudo persistido em banco de dados real via Supabase.
 
-> **Nota sobre tempo real:** o MVP não usa Supabase Realtime para economizar recursos. O histórico de rolagens atualiza para o próprio usuário após cada rolagem. Outros membros veem as novas rolagens ao recarregar a página. Realtime pode ser reativado futuramente.
+> **Nota sobre tempo real:** o MVP evita Supabase Realtime pra economizar recursos — a maioria das listas e painéis usa polling. Três exceções, onde o atraso do polling era perceptível demais: o **chat da campanha** (mensagens aparecem na hora), o **pop-up de notificação de rolagem de dado** e o **histórico "Recentes" no painel de dados** (ambos disparam na hora, sem esperar o próximo ciclo de polling).
 
 ---
 
@@ -101,7 +101,7 @@ Authentication → URL Configuration
 
 As migrations devem ser aplicadas **em ordem**, uma por vez, no **Supabase Dashboard → SQL Editor → New query**.
 
-O repositório contém **33 migrations SQL**. A lista abaixo é o contrato canônico da
+O repositório contém **34 migrations SQL**. A lista abaixo é o contrato canônico da
 ordem de aplicação; não existe uma migration `20240121000000_my_sheets.sql` neste
 repositório e ela não deve ser criada ou aplicada sem uma decisão explícita de
 schema.
@@ -141,6 +141,7 @@ schema.
 | 31 | `20240133000000_campaign_chat.sql` | Adiciona `campaign_messages` (com Realtime habilitado) e `campaign_chat_reads` + RPC `mark_campaign_chat_read` — chat da campanha em tempo real |
 | 32 | `20240134000000_campaign_messages_replica_identity.sql` | `REPLICA IDENTITY FULL` em `campaign_messages` — sem isso, o evento de DELETE em tempo real não chega (o filtro por `campaign_id` não bate com o payload reduzido padrão) |
 | 33 | `20240135000000_private_messages.sql` | Adiciona `campaign_messages.recipient_id` (mensagem privada) com policies atualizadas — só mestre⇄jogador, nunca jogador⇄jogador — e `campaign_private_message_reads` + RPCs `mark_private_thread_read`/`get_private_message_unread_counts` |
+| 34 | `20240136000000_dice_rolls_realtime.sql` | Adiciona `dice_rolls` de volta à publicação Realtime — só para o pop-up global de notificação disparar na hora, sem esperar o polling de 20s |
 
 > **Usuários criados antes da migration 1:** o trigger `handle_new_user` cria perfis apenas para novos cadastros. Para sincronizar usuários já existentes, rode o script de backfill comentado na seção 9 da migration 1.
 
@@ -168,7 +169,7 @@ Antes de abrir um deploy ou adicionar uma migration, execute:
 npm run verify
 ```
 
-O comando valida as 33 migrations registradas e depois executa o build de produção.
+O comando valida as 34 migrations registradas e depois executa o build de produção.
 
 ---
 
@@ -330,10 +331,11 @@ mestre) — fica discreta de propósito. Mensagem de chat vira pop-up mas
 **não** conta no selo do sino global — o "não lido" de chat mora só na
 própria aba (ver seção "Chat da campanha").
 
-Checa a cada 60s, também sem Realtime — exceto mensagem de chat, que usa
-Realtime de verdade (assina `campaign_messages` em todas as campanhas do
-usuário, sem filtro de campanha; funciona porque o Realtime do Supabase
-já respeita RLS) e por isso aparece na hora, sem esperar o próximo ciclo.
+Checa a cada 20s, também sem Realtime — exceto mensagem de chat e
+rolagem de dados, que usam Realtime de verdade (assinam
+`campaign_messages`/`dice_rolls` em todas as campanhas do usuário, sem
+filtro de campanha; funciona porque o Realtime do Supabase já respeita
+RLS) e por isso aparecem na hora, sem esperar o próximo ciclo.
 O relógio de "já visto" desse pop-up é separado do sino e só existe na
 memória do navegador — recarregar a página zera e passa a valer só dali
 pra frente, pra não disparar uma enxurrada de pop-ups de coisa antiga a
@@ -432,9 +434,8 @@ A aba **"Visão Geral"** mostra um card de Sessões com a contagem total, o tít
 
 ## Observações importantes
 
-**Supabase Realtime desativado no MVP**
-O histórico de rolagens atualiza localmente após o próprio usuário rolar. Outros membros veem as novas rolagens ao recarregar a página. Isso evita uso desnecessário de conexões WebSocket no MVP.
-Para reativar no futuro: adicione `dice_rolls` à publicação em **Dashboard → Database → Replication** e restaure `subscribeToRolls` em `diceService.ts` e `DiceRollerPanel.tsx`.
+**Supabase Realtime parcial no MVP**
+`dice_rolls` está na publicação Realtime (migration 34) para dois consumidores: o pop-up global de notificação (`subscribeToNewRollsGlobally`, um canal sem filtro de campanha) e o histórico "Recentes" do painel de dados (`subscribeToRolls`, um canal por campanha — mesmo padrão do chat). Rolagem de qualquer jogador ou do mestre aparece na hora nos dois lugares, sem precisar reabrir o painel ou clicar em "Atualizar".
 
 **Segurança no banco**
 Toda inserção em `campaign_members` acontece via RPC (`add_campaign_player`, `create_campaign`) — insert direto está bloqueado pelo RLS. Fichas têm trigger que impede alteração de `campaign_id` e `user_id`. Rolagens têm constraint que valida o intervalo por tipo de dado.
@@ -445,7 +446,7 @@ Toda inserção em `campaign_members` acontece via RPC (`add_campaign_player`, `
 
 ```
 supabase/
-└── migrations/             ← 33 migrations em ordem
+└── migrations/             ← 34 migrations em ordem
 
 src/
 ├── app/

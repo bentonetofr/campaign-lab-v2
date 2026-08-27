@@ -360,3 +360,26 @@ export async function getCampaignRolls(
     profile:            row.profiles,
   }))
 }
+
+/**
+ * Assina INSERT em `dice_rolls` de uma campanha específica. O payload só
+ * traz as colunas cruas da tabela (sem join de perfil) — quem chama
+ * resolve o autor por fora (ex: mapa local de membros já carregado) e
+ * completa o `DiceRollWithProfile`. RLS já filtra o que chega: rolagem
+ * oculta de outro jogador nunca aparece pra quem não é o mestre.
+ */
+export function subscribeToRolls(
+  campaignId: string,
+  onInsert: (row: DiceRoll) => void,
+): () => void {
+  const channel = supabase
+    .channel(`dice_rolls:${campaignId}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'dice_rolls', filter: `campaign_id=eq.${campaignId}` },
+      (payload) => onInsert(payload.new as DiceRoll),
+    )
+    .subscribe()
+
+  return () => { supabase.removeChannel(channel) }
+}

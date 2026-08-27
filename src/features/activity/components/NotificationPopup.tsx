@@ -5,6 +5,8 @@ import {
   getLiveNotifications,
   getMessageNotification,
   subscribeToNewMessagesGlobally,
+  getDiceRollNotification,
+  subscribeToNewRollsGlobally,
   type LiveNotification,
 } from '../services/activityService'
 import './NotificationPopup.css'
@@ -91,6 +93,24 @@ export function NotificationPopup() {
       seenIdsRef.current.add(id)
 
       const notif = await getMessageNotification(messageId)
+      if (notif) setQueue((q) => [...q, notif])
+    })
+
+    return unsubscribe
+  }, [user])
+
+  // ── Rolagem de dado também é Realtime de verdade, pelo mesmo motivo do
+  // chat acima — sem isso, o pop-up esperava até 20s pelo próximo poll. ──
+  useEffect(() => {
+    if (!user) return
+
+    const unsubscribe = subscribeToNewRollsGlobally(user.id, async (rollId) => {
+      const id = `dice-${rollId}`
+      if (!seenIdsRef.current) seenIdsRef.current = new Set()
+      if (seenIdsRef.current.has(id)) return
+      seenIdsRef.current.add(id)
+
+      const notif = await getDiceRollNotification(rollId)
       if (notif) setQueue((q) => [...q, notif])
     })
 

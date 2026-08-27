@@ -341,33 +341,27 @@ function mapMessageRow(row: MessageRow): LiveNotification {
  * Busca os últimos `limit` eventos de cada fonte pro mecanismo de pop-up.
  * Não filtra por data — quem chama decide o que já foi mostrado (por id),
  * evitando qualquer comparação de timestamp/fuso do lado da consulta.
- * Diferente do selo, rolagem oculta nunca aparece aqui (nem pro mestre) —
- * só rolagem pública. "Fui adicionado a uma campanha" não dá pra pegar de
- * forma confiável pelo actor_id de campaign_activity (varia se foi convite
- * por e-mail ou link), então lê direto de campaign_members.
+ * "Fui adicionado a uma campanha" não dá pra pegar de forma confiável
+ * pelo actor_id de campaign_activity (varia se foi convite por e-mail ou
+ * link), então lê direto de campaign_members.
  *
- * Mensagem de chat NÃO entra aqui — ao contrário das outras fontes, ela é
- * pega via Realtime de verdade (`subscribeToNewMessagesGlobally` +
- * `getMessageNotification` logo abaixo), pra não ficar até 20s atrasada
- * em relação à mensagem que já chegou instantânea no próprio chat.
+ * Mensagem de chat e rolagem de dado NÃO entram aqui — ao contrário das
+ * outras fontes, cada uma é pega via Realtime de verdade
+ * (`subscribeToNewMessagesGlobally`/`getMessageNotification` e
+ * `subscribeToNewRollsGlobally`/`getDiceRollNotification`, logo abaixo),
+ * pra não ficar até 20s atrasada em relação ao evento que já aconteceu
+ * na hora.
  */
 export async function getLiveNotifications(limit = 8): Promise<LiveNotification[]> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  const [activityRes, diceRes, memberRes] = await Promise.all([
+  const [activityRes, memberRes] = await Promise.all([
     supabase
       .from('campaign_activity')
       .select('id, message, created_at, campaigns(name)')
       .in('type', POPUP_ACTIVITY_TYPES)
       .neq('actor_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(limit),
-    supabase
-      .from('dice_rolls')
-      .select('id, formula, die_type, result, created_at, campaigns(name), profiles(display_name)')
-      .eq('is_private', false)
-      .neq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(limit),
     supabase
@@ -379,18 +373,63 @@ export async function getLiveNotifications(limit = 8): Promise<LiveNotification[
   ])
 
   if (activityRes.error) console.error('[getLiveNotifications] erro em campaign_activity:', activityRes.error)
-  if (diceRes.error)     console.error('[getLiveNotifications] erro em dice_rolls:', diceRes.error)
   if (memberRes.error)   console.error('[getLiveNotifications] erro em campaign_members:', memberRes.error)
 
   const events: LiveNotification[] = [
     ...((activityRes.data ?? []) as unknown as ActivityRow[]).map(mapActivityRow),
-    ...((diceRes.data ?? []) as unknown as DiceRow[]).map(mapDiceRow),
     ...((memberRes.data ?? []) as unknown as MemberRow[]).map(mapMemberRow),
   ]
 
   // mais antigo primeiro, pra fila do pop-up mostrar em ordem cronológica
   events.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   return events
+}
+
+/**
+ * Assina INSERT em `dice_rolls` de todas as campanhas do usuário — mesmo
+ * raciocínio de `subscribeToNewMessagesGlobally`: Realtime respeita RLS,
+ * então só chegam linhas que o usuário teria permissão de ver de qualquer
+ * forma. Ignora a própria rolagem e qualquer rolagem privada — o pop-up de
+ * dado nunca mostra rolagem oculta, nem pro mestre (mesma regra de quando
+ * isso era feito via polling). O payload de INSERT do Realtime traz todas
+ * as colunas (diferente do payload reduzido de DELETE), então dá pra
+ * filtrar por `is_private` sem consulta extra.
+ */
+export function subscribeToNewRollsGlobally(
+  currentUserId: string,
+  onRoll: (rollId: string) => void,
+): () => void {
+  const channel = supabase
+    .channel('global-dice-notifications')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'dice_rolls' },
+      (payload) => {
+        const row = payload.new as { id: string; user_id: string; is_private: boolean }
+        if (row.user_id === currentUserId) return
+        if (row.is_private) return
+        onRoll(row.id)
+      },
+    )
+    .subscribe()
+
+  return () => { supabase.removeChannel(channel) }
+}
+
+/**
+ * Busca uma rolagem específica já formatada como notificação. O evento de
+ * Realtime só traz as colunas cruas (sem nome do autor/campanha) — essa
+ * busca completa com uma consulta pelo id.
+ */
+export async function getDiceRollNotification(rollId: string): Promise<LiveNotification | null> {
+  const { data, error } = await supabase
+    .from('dice_rolls')
+    .select('id, formula, die_type, result, created_at, campaigns(name), profiles(display_name)')
+    .eq('id', rollId)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return mapDiceRow(data as unknown as DiceRow)
 }
 
 /**
