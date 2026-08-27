@@ -38,6 +38,21 @@ function formatTypingUsers(names: string[]): string {
   return `${names[0]} e mais ${names.length - 1} estão digitando`
 }
 
+const NEW_MESSAGE_SOUND_URL = '/win-notify.mp3'
+
+function playNewMessageSound() {
+  try {
+    const audio = new Audio(NEW_MESSAGE_SOUND_URL)
+    audio.volume = 0.6
+    void audio.play().catch(() => {
+      // autoplay bloqueado pelo navegador ou outro erro — nunca deve
+      // quebrar o chat, o som é só um extra
+    })
+  } catch {
+    // ambiente sem suporte à Audio API — ignora
+  }
+}
+
 // ────────────────────────────────────────────────────────
 // Utilitários
 // ────────────────────────────────────────────────────────
@@ -141,6 +156,7 @@ export function CampaignChatPanel({ campaignId, currentUserId, userRole }: Campa
             profile,
           }]
         })
+        if (row.user_id !== currentUserId) playNewMessageSound()
         if (isNearBottomRef.current) requestAnimationFrame(scrollToBottom)
       },
       (id) => {

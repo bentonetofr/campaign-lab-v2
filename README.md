@@ -101,7 +101,7 @@ Authentication → URL Configuration
 
 As migrations devem ser aplicadas **em ordem**, uma por vez, no **Supabase Dashboard → SQL Editor → New query**.
 
-O repositório contém **31 migrations SQL**. A lista abaixo é o contrato canônico da
+O repositório contém **32 migrations SQL**. A lista abaixo é o contrato canônico da
 ordem de aplicação; não existe uma migration `20240121000000_my_sheets.sql` neste
 repositório e ela não deve ser criada ou aplicada sem uma decisão explícita de
 schema.
@@ -139,6 +139,7 @@ schema.
 | 29 | `20240131000000_dice_private_rolls.sql` | Adiciona `dice_rolls.is_private` e substitui a policy de SELECT — rolagens privadas só ficam visíveis para quem rolou e para o mestre da campanha |
 | 30 | `20240132000000_notification_seen_at.sql` | Adiciona `profiles.activity_seen_at` — marca quando o usuário viu notificações pela última vez |
 | 31 | `20240133000000_campaign_chat.sql` | Adiciona `campaign_messages` (com Realtime habilitado) e `campaign_chat_reads` + RPC `mark_campaign_chat_read` — chat da campanha em tempo real |
+| 32 | `20240134000000_campaign_messages_replica_identity.sql` | `REPLICA IDENTITY FULL` em `campaign_messages` — sem isso, o evento de DELETE em tempo real não chega (o filtro por `campaign_id` não bate com o payload reduzido padrão) |
 
 > **Usuários criados antes da migration 1:** o trigger `handle_new_user` cria perfis apenas para novos cadastros. Para sincronizar usuários já existentes, rode o script de backfill comentado na seção 9 da migration 1.
 
@@ -166,7 +167,7 @@ Antes de abrir um deploy ou adicionar uma migration, execute:
 npm run verify
 ```
 
-O comando valida as 31 migrations registradas e depois executa o build de produção.
+O comando valida as 32 migrations registradas e depois executa o build de produção.
 
 ---
 
@@ -360,6 +361,9 @@ subscription (`postgres_changes`), sem polling.
   campanha, não cruza para outras campanhas). Some ao abrir a aba.
 - **Indicador de "digitando..."** — via Realtime Broadcast (efêmero, não
   grava no banco), some sozinho se parar de chegar aviso por ~3,5s.
+- Som próprio (diferente do som de notificação) toca quando chega mensagem
+  de outra pessoa **enquanto a aba de chat já está aberta** — o pop-up
+  global fica suprimido nesse caso, então esse som é o único aviso.
 
 **Migration necessária:** `20240133000000_campaign_chat.sql` deve estar
 aplicada — ela também habilita a publicação Realtime para
