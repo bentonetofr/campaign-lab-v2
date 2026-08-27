@@ -17,17 +17,24 @@ export function NotificationPopup() {
   const [current, setCurrent] = useState<LiveNotification | null>(null)
   const [leaving, setLeaving] = useState(false)
 
-  // Relógio só em memória — começa "agora" ao carregar o app. Recarregar a
-  // página reseta e passa a valer só dali pra frente, de propósito: evita
-  // uma enxurrada de pop-ups de coisa antiga a cada F5.
-  const cursorRef = useRef(new Date().toISOString())
+  // IDs já mostrados — só em memória. null = ainda não fez a primeira
+  // checagem. Na primeira checagem só registra o que já existe, sem
+  // disparar pop-up (senão vira uma enxurrada de coisa antiga a cada F5);
+  // dali pra frente, só o que for realmente novo entra na fila.
+  const seenIdsRef = useRef<Set<string> | null>(null)
 
   const poll = useCallback(async () => {
-    const since = cursorRef.current
-    cursorRef.current = new Date().toISOString()
     try {
-      const events = await getLiveNotifications(since)
-      if (events.length > 0) setQueue((q) => [...q, ...events])
+      const events = await getLiveNotifications()
+
+      if (seenIdsRef.current === null) {
+        seenIdsRef.current = new Set(events.map((e) => e.id))
+        return
+      }
+
+      const fresh = events.filter((e) => !seenIdsRef.current!.has(e.id))
+      for (const e of fresh) seenIdsRef.current.add(e.id)
+      if (fresh.length > 0) setQueue((q) => [...q, ...fresh])
     } catch (err) {
       // nunca quebra a tela por causa do pop-up, mas loga pra dar pra debugar
       console.error('Falha ao buscar notificações ao vivo:', err)

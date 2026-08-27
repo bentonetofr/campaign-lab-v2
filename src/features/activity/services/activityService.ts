@@ -314,13 +314,15 @@ function mapMemberRow(row: MemberRow): LiveNotification {
 }
 
 /**
- * Busca eventos novos desde `since` para virar pop-up. Diferente do selo,
- * rolagem oculta nunca aparece aqui (nem pro mestre) — só rolagem pública.
- * "Fui adicionado a uma campanha" não dá pra pegar de forma confiável pelo
- * actor_id de campaign_activity (varia se foi convite por e-mail ou link),
- * então lê direto de campaign_members.
+ * Busca os últimos `limit` eventos de cada fonte pro mecanismo de pop-up.
+ * Não filtra por data — quem chama decide o que já foi mostrado (por id),
+ * evitando qualquer comparação de timestamp/fuso do lado da consulta.
+ * Diferente do selo, rolagem oculta nunca aparece aqui (nem pro mestre) —
+ * só rolagem pública. "Fui adicionado a uma campanha" não dá pra pegar de
+ * forma confiável pelo actor_id de campaign_activity (varia se foi convite
+ * por e-mail ou link), então lê direto de campaign_members.
  */
-export async function getLiveNotifications(since: string): Promise<LiveNotification[]> {
+export async function getLiveNotifications(limit = 8): Promise<LiveNotification[]> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
@@ -330,22 +332,26 @@ export async function getLiveNotifications(since: string): Promise<LiveNotificat
       .select('id, message, created_at, campaigns(name)')
       .in('type', POPUP_ACTIVITY_TYPES)
       .neq('actor_id', user.id)
-      .gt('created_at', since)
-      .order('created_at', { ascending: true }),
+      .order('created_at', { ascending: false })
+      .limit(limit),
     supabase
       .from('dice_rolls')
       .select('id, formula, die_type, result, created_at, campaigns(name), profiles(display_name)')
       .eq('is_private', false)
       .neq('user_id', user.id)
-      .gt('created_at', since)
-      .order('created_at', { ascending: true }),
+      .order('created_at', { ascending: false })
+      .limit(limit),
     supabase
       .from('campaign_members')
       .select('id, created_at, campaigns(name)')
       .eq('user_id', user.id)
-      .gt('created_at', since)
-      .order('created_at', { ascending: true }),
+      .order('created_at', { ascending: false })
+      .limit(limit),
   ])
+
+  if (activityRes.error) console.error('[getLiveNotifications] erro em campaign_activity:', activityRes.error)
+  if (diceRes.error)     console.error('[getLiveNotifications] erro em dice_rolls:', diceRes.error)
+  if (memberRes.error)   console.error('[getLiveNotifications] erro em campaign_members:', memberRes.error)
 
   const events: LiveNotification[] = [
     ...((activityRes.data ?? []) as unknown as ActivityRow[]).map(mapActivityRow),
@@ -353,6 +359,7 @@ export async function getLiveNotifications(since: string): Promise<LiveNotificat
     ...((memberRes.data ?? []) as unknown as MemberRow[]).map(mapMemberRow),
   ]
 
+  // mais antigo primeiro, pra fila do pop-up mostrar em ordem cronológica
   events.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   return events
 }
