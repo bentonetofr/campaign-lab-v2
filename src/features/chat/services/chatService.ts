@@ -60,7 +60,7 @@ export async function getCampaignMessages(
 ): Promise<ChatMessage[]> {
   let query = supabase
     .from('campaign_messages')
-    .select('id, campaign_id, user_id, recipient_id, content, created_at, profiles(id, display_name, avatar_url)')
+    .select('id, campaign_id, user_id, recipient_id, content, created_at, profiles!user_id(id, display_name, avatar_url)')
     .eq('campaign_id', campaignId)
     .order('created_at', { ascending: false })
     .limit(limit)

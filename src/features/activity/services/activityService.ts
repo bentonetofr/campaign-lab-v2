@@ -432,7 +432,7 @@ export function subscribeToNewMessagesGlobally(
 export async function getMessageNotification(messageId: string): Promise<LiveNotification | null> {
   const { data, error } = await supabase
     .from('campaign_messages')
-    .select('id, content, recipient_id, created_at, campaigns(name), profiles(display_name)')
+    .select('id, content, recipient_id, created_at, campaigns(name), profiles!user_id(display_name)')
     .eq('id', messageId)
     .maybeSingle()
 
@@ -467,7 +467,7 @@ export async function getRecentNotifications(limit = 3): Promise<LiveNotificatio
       .limit(limit),
     supabase
       .from('campaign_messages')
-      .select('id, content, recipient_id, created_at, campaigns(name), profiles(display_name)')
+      .select('id, content, recipient_id, created_at, campaigns(name), profiles!user_id(display_name)')
       .neq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(limit),
